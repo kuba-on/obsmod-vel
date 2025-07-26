@@ -1,3 +1,11 @@
+########################################
+
+# The code below calculates a multiyear mean of the ratio data, estimating the dominant driver of seasonality in ice velocity (frontal vs fricitonal and generates a multiyear heatmap visualisation.
+
+########################################
+
+
+
 ##### MULTI-GLACIER 5-YEAR MEAN PROCESSING & PLOTTING #####
 
 # Parent directory containing all glacier folders

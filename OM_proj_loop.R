@@ -1,4 +1,72 @@
-##### DATA PREP #####
+########################################
+
+# The code below processes observational and modelled ice velocity data in a loop. The processing includes:
+# 1. Data preparation: 
+  # - reading glacier folders and mapping glacier names.
+
+# 2. Observational data processing: 
+  ### process_data function: 
+  # - loads observational data, 
+  # - filters data by date range, satellites, and time seperation between acquisition dates, 
+  # - aggregates data by mean daily velocity.
+  ### remove_outliers function:
+  # - removes outliers from the data using IQR criterion.
+  ### calculate_anomalies function:
+  # - calculates anomalies using weighted means by monthly means and counts,
+  # - normalises anomalies to the range [-1, 1].
+  ### plot_boxplots function:
+  # - plots boxplots of velocity data for each year and elevation band for initial visual inspection.
+  ### create_yearly_subsets function:
+  # - creates yearly subsets of the data, 
+  # - normalises velocity for each yearly subset.
+
+# 3. Model data processing:
+  # - gets model data corresponding to observational data for each glacier,
+  ### process_model_data function:
+  # - loads model data, 
+  # - filters by date range,
+  # - interpolates data to daily resolution using natural cubic spline,
+  # - distinguishes original modelled and interpolated data.
+  ### calculate_model_anomalies function:
+  # - calculates anomalies for model data and normalises them.
+  ### create_yearly_subsets_model function:
+  # - creates yearly subsets of the data,
+  # - normalises velocity for each yearly subset.
+
+# 4. Residuals calculation:
+  ### calculate_residuals function:
+  # - merges observational and modelled data by date,
+  # - calculates residual anomalies between observed and modeled anomalies,
+  # - normalises residual anomalies to the range [-1, 1].
+
+# 5. Spline fitting:
+  ### fit_spline_to_anomaly function:
+  # - fits a smooth spline to the observed anomaly data for each elevation—yearly subset with a specified global degree of freedom,
+  # - calculates residuals, standard deviation, and confidence intervals.
+  ### fit_spline_to_anomaly_model function:
+  # - fits a smooth spline to the modelled anomaly data for each elevation—yearly subset with a specified global degree of freedom,
+  # - calculates residuals, standard deviation, and confidence intervals.
+  ### fit_spline_to_residuals function:
+  # - fits a smooth spline to the residual anomaly data for each elevation—yearly subset with a specified global degree of freedom,
+  # - calculates residuals, standard deviation, and confidence intervals.
+
+# 6. Calculating drivers of seasonality (ratioing):
+  ### calculate_ratio function:
+  # - assigns ratio between absolute areas bounded by spline functions for each elevation—yearly subset,
+  # - returns ratio data centred at 1, estimating the dominant driver of seasonality in ice velocity (frontal vs fricitonal).
+  
+# 7. Graphing:
+  # - a: plots the spline fits for observed and modelled anomalies for each elevation—yearly subset as a subplot,
+  # - b: plots the spline fits for observed, modelled and residual anomalies for each elevation—yearly subset as a subplot,
+  # - c: plots the ratio data for each elevation—yearly subset as a heatmap and binary heatmap (frontal or frictional).
+
+#########################################
+
+
+
+
+
+##### 1. DATA PREPERATION #####
 
 # Parent directory containing all glacier folders (Gl1, Gl2, ..., GlN)
 parent_directory <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Jess ITS_LIVE v2/Inputs/Observations/v2"
@@ -34,7 +102,7 @@ for (obs_data_path in glacier_folders) {
     return((x - min(x, na.rm = TRUE)) / (max(x, na.rm = TRUE) - min(x, na.rm = TRUE)))
   }
   
-  ##### OBSERVATIONAL DATA PROCESSING #####
+  ##### 2. OBSERVATIONAL DATA PROCESSING #####
   
   # Function to create yearly subsets
   create_yearly_subsets <- function(data, file_number) {
@@ -450,7 +518,7 @@ for (obs_data_path in glacier_folders) {
   } else {
     cat("No valid model data was processed. Check your files or filters.\n")
   }
-  ##### RESIDUALS #####
+  ##### 4. RESIDUAL CALCULATION #####
   
   # Function to calculate residuals between observed and modeled anomalies
   calculate_residuals <- function(data_with_anomalies_obs, data_with_anomalies_model) {
@@ -509,7 +577,7 @@ for (obs_data_path in glacier_folders) {
     cat("Observational or modeled data with anomalies is missing. Residuals cannot be calculated.\n")
   }
   
-  ##### SPLINE #####
+  ##### 5. SPLINE FITTING #####
   
   # Function to fit a spline to each elevation's anomaly data (observational)
   fit_spline_to_anomaly <- function(data_with_anomalies_obs) {
@@ -676,8 +744,111 @@ for (obs_data_path in glacier_folders) {
   } else {
     cat("Residuals data is missing or empty. Splines cannot be calculated.\n")
   }
+
+
+  ##### 6. CALCULATING DRIVERS OF SEASONALITY (RATIOING) #####
   
-  ##### GRAPH OF OBS_MODEL ##### 
+  # Define years and elevation bands
+  years <- 2016:2021
+  elevations <- 1:15  # Assuming 15 elevation bands
+  
+  # Initialize matrix for storing ratios
+  ratio_matrix <- matrix(NA, nrow = length(years), ncol = length(elevations),
+                         dimnames = list(as.character(years), as.character(elevations * 100)))
+  
+  # Compute absolute areas for each year and elevation band
+  for (year in years) {
+    for (elevation in elevations) {
+      subset_name <- paste0("year", year, "_", elevation)
+      
+      
+      # Ensure spline fits exist
+      if (!(subset_name %in% names(spline_fits_obs)) || 
+          !(subset_name %in% names(spline_fits_model)) || 
+          !(subset_name %in% names(spline_fits_residuals))) {
+        next  # Skip if missing
+      }
+      
+      # Extract spline fits
+      spline_obs <- spline_fits_obs[[subset_name]]
+      spline_model <- spline_fits_model[[subset_name]]
+      spline_residual <- spline_fits_residuals[[subset_name]]
+      
+      # Ensure data is non-empty
+      if (nrow(spline_obs) == 0 || nrow(spline_model) == 0 || nrow(spline_residual) == 0) {
+        next  # Skip empty data
+      }
+      
+      # Extract common date range
+      common_dates <- Reduce(intersect, list(spline_obs$date, spline_model$date, spline_residual$date))
+      
+      if (length(common_dates) == 0) next  # Skip if no overlap
+      
+      common_dates <- as.Date(common_dates)  # ensure Date class
+      spline_obs$date <- as.Date(spline_obs$date)
+      spline_model$date <- as.Date(spline_model$date)
+      spline_residual$date <- as.Date(spline_residual$date)
+      
+      # Extract values at common dates
+      obs_values <- spline_obs$fitted_anomaly[spline_obs$date %in% common_dates]
+      model_values <- spline_model$fitted_anomaly[spline_model$date %in% common_dates]
+      residual_values <- spline_residual$fitted_residual[spline_residual$date %in% common_dates]
+      
+      # Remove NA values
+      valid_indices <- complete.cases(obs_values, model_values, residual_values)
+      
+      if (sum(valid_indices) == 0) next  # Skip if all values are NA
+      
+      # Compute absolute areas
+      area_front <- sum(abs(obs_values[valid_indices] - residual_values[valid_indices]), na.rm = TRUE)
+      area_basal <- sum(abs(obs_values[valid_indices] - model_values[valid_indices]), na.rm = TRUE)
+      
+      # Assign ratio, avoiding division by zero
+      if (area_basal == 0) {
+        ratio_matrix[as.character(year), as.character(elevation * 100)] <- NA
+      } else {
+        ratio_matrix[as.character(year), as.character(elevation * 100)] <- area_front / area_basal
+      }
+    }
+  }
+  
+  # Save as CSV
+  output_dir <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Jess ITS_LIVE v2/Outputs/Ratios"
+  if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
+  csv_file_path <- file.path(output_dir, paste0(folder_name, "_ratio.csv"))
+  write.csv(ratio_matrix, file = csv_file_path, row.names = TRUE)
+  cat("Ratio matrix saved at:", csv_file_path, "\n")
+  
+  
+  
+  # Define the subset name for year 2017, elevation 1
+  subset_name <- "year2017_1"
+  
+  # Retrieve spline fits for the given year and elevation
+  spline_obs <- spline_fits_obs[[subset_name]]
+  spline_model <- spline_fits_model[[subset_name]]
+  spline_residual <- spline_fits_residuals[[subset_name]]
+  
+  # Find common date range where all three splines exist
+  common_dates <- Reduce(intersect, list(spline_obs$date, spline_model$date, spline_residual$date))
+  common_dates <- as.Date(common_dates, format = '%Y-%m-%d', origin = "1970-01-01")
+  
+  # Extract values at common dates
+  obs_values <- spline_obs$fitted_anomaly[spline_obs$date %in% common_dates]
+  model_values <- spline_model$fitted_anomaly[spline_model$date %in% common_dates]
+  residual_values <- spline_residual$fitted_residual[spline_residual$date %in% common_dates]
+  
+  # Print the values directly in RStudio
+  print(data.frame(
+    date = common_dates,
+    obs_spline = obs_values,
+    model_spline = model_values,
+    residual_spline = residual_values
+  ))
+
+
+  
+  ##### 7a. GRAPH OF OBS_MODEL ##### 
   
   # Define the path to save the PDF
   pdf_file_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Jess ITS_LIVE v2/Outputs/Obs_Model",
@@ -848,7 +1019,7 @@ for (obs_data_path in glacier_folders) {
   
   
   
-  ##### GRAPH OF OBS_MODEL_RES ##### 
+  ##### 7b. GRAPH OF OBS_MODEL_RES ##### 
   
   # Define the path to save the PDF
   pdf_file_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Jess ITS_LIVE v2/Outputs/Obs_Model_Res",
@@ -1050,108 +1221,9 @@ for (obs_data_path in glacier_folders) {
   # Notify user of the output location
   cat("Graph saved as PDF at:", pdf_file_path, "\n")
   
-  ##### FRONTAL VS BASAL RATIO #####
-  
-  # Define years and elevation bands
-  years <- 2016:2021
-  elevations <- 1:15  # Assuming 15 elevation bands
-  
-  # Initialize matrix for storing ratios
-  ratio_matrix <- matrix(NA, nrow = length(years), ncol = length(elevations),
-                         dimnames = list(as.character(years), as.character(elevations * 100)))
-  
-  # Compute absolute areas for each year and elevation band
-  for (year in years) {
-    for (elevation in elevations) {
-      subset_name <- paste0("year", year, "_", elevation)
-      
-      
-      # Ensure spline fits exist
-      if (!(subset_name %in% names(spline_fits_obs)) || 
-          !(subset_name %in% names(spline_fits_model)) || 
-          !(subset_name %in% names(spline_fits_residuals))) {
-        next  # Skip if missing
-      }
-      
-      # Extract spline fits
-      spline_obs <- spline_fits_obs[[subset_name]]
-      spline_model <- spline_fits_model[[subset_name]]
-      spline_residual <- spline_fits_residuals[[subset_name]]
-      
-      # Ensure data is non-empty
-      if (nrow(spline_obs) == 0 || nrow(spline_model) == 0 || nrow(spline_residual) == 0) {
-        next  # Skip empty data
-      }
-      
-      # Extract common date range
-      common_dates <- Reduce(intersect, list(spline_obs$date, spline_model$date, spline_residual$date))
-      
-      if (length(common_dates) == 0) next  # Skip if no overlap
-      
-      common_dates <- as.Date(common_dates)  # ensure Date class
-      spline_obs$date <- as.Date(spline_obs$date)
-      spline_model$date <- as.Date(spline_model$date)
-      spline_residual$date <- as.Date(spline_residual$date)
-      
-      # Extract values at common dates
-      obs_values <- spline_obs$fitted_anomaly[spline_obs$date %in% common_dates]
-      model_values <- spline_model$fitted_anomaly[spline_model$date %in% common_dates]
-      residual_values <- spline_residual$fitted_residual[spline_residual$date %in% common_dates]
-      
-      # Remove NA values
-      valid_indices <- complete.cases(obs_values, model_values, residual_values)
-      
-      if (sum(valid_indices) == 0) next  # Skip if all values are NA
-      
-      # Compute absolute areas
-      area_front <- sum(abs(obs_values[valid_indices] - residual_values[valid_indices]), na.rm = TRUE)
-      area_basal <- sum(abs(obs_values[valid_indices] - model_values[valid_indices]), na.rm = TRUE)
-      
-      # Assign ratio, avoiding division by zero
-      if (area_basal == 0) {
-        ratio_matrix[as.character(year), as.character(elevation * 100)] <- NA
-      } else {
-        ratio_matrix[as.character(year), as.character(elevation * 100)] <- area_front / area_basal
-      }
-    }
-  }
-  
-  # Save as CSV
-  output_dir <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Jess ITS_LIVE v2/Outputs/Ratios"
-  if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
-  csv_file_path <- file.path(output_dir, paste0(folder_name, "_ratio.csv"))
-  write.csv(ratio_matrix, file = csv_file_path, row.names = TRUE)
-  cat("Ratio matrix saved at:", csv_file_path, "\n")
   
   
-  
-  # Define the subset name for year 2017, elevation 1
-  subset_name <- "year2017_1"
-  
-  # Retrieve spline fits for the given year and elevation
-  spline_obs <- spline_fits_obs[[subset_name]]
-  spline_model <- spline_fits_model[[subset_name]]
-  spline_residual <- spline_fits_residuals[[subset_name]]
-  
-  # Find common date range where all three splines exist
-  common_dates <- Reduce(intersect, list(spline_obs$date, spline_model$date, spline_residual$date))
-  common_dates <- as.Date(common_dates, format = '%Y-%m-%d', origin = "1970-01-01")
-  
-  # Extract values at common dates
-  obs_values <- spline_obs$fitted_anomaly[spline_obs$date %in% common_dates]
-  model_values <- spline_model$fitted_anomaly[spline_model$date %in% common_dates]
-  residual_values <- spline_residual$fitted_residual[spline_residual$date %in% common_dates]
-  
-  # Print the values directly in RStudio
-  print(data.frame(
-    date = common_dates,
-    obs_spline = obs_values,
-    model_spline = model_values,
-    residual_spline = residual_values
-  ))
-  
-  
-  ##### RATIO HEATMAP #####
+  ##### 7c. RATIO HEATMAP #####
   
   # Define file path for the PDF
   pdf_file_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Jess ITS_LIVE v2/Outputs/Heatmaps",
