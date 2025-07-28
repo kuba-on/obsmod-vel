@@ -1,0 +1,3 @@
+[submodule "itslive-py"]
+	path = itslive-py
+	url = https://github.com/kuba-on/itslive-py.git
