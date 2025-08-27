@@ -1,3 +1,6 @@
 [submodule "itslive-py"]
 	path = itslive-py
 	url = https://github.com/kuba-on/itslive-py.git
+[submodule "glacier-flow-tools"]
+	path = glacier-flow-tools
+	url = https://github.com/pism/glacier-flow-tools.git
