@@ -24,7 +24,7 @@ from itslive.velocity_cubes._cubes import get_time_series, export_csv
 
 # Define directories and catalog URL
 CATALOG_URL = "https://its-live-data.s3.amazonaws.com/datacubes/catalog_v02.json"
-INPUT_DIR = "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/New Points v3/Points/Sampling Points/Test Glaciers"
+INPUT_DIR = "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/New Points v3/Points/Sampling Points/as CSV"
 OUTPUT_DIR = "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Jess ITS_LIVE v3"
 
 # Load ITS_LIVE catalog
