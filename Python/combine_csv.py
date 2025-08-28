@@ -1,12 +1,20 @@
+########################################
+
+# The code below combines multiple CSV files from each glacier's band folder into a single CSV file.
+# It reads all CSV files in each band folder, skips headers after the first file, and writes the combined data to a new CSV file named after the band folder with "_comb.csv" appended to the name.
+# The combined CSV files are saved in the respective glacier folder.
+
+########################################
+
 from pathlib import Path
 
-base_dir = Path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Jess ITS_LIVE v2/Inputs/Observations/v2")
+base_dir = Path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Inputs/Observations")
 
-for glacier_folder in base_dir.glob("Gl*"):
+for glacier_folder in base_dir.glob("Glacier*"):
     if not glacier_folder.is_dir():
         continue
 
-    for band_folder in glacier_folder.glob("Gl*_v2"):
+    for band_folder in glacier_folder.glob("gl*_v3"):
         if not band_folder.is_dir():
             continue
 
@@ -26,4 +34,4 @@ for glacier_folder in base_dir.glob("Gl*"):
                     else:
                         outfile.writelines(lines[1:])  # skip header
 
-        print(f"✅ Combined to: {combined_path}")
+        print(f" Combined to: {combined_path}")
