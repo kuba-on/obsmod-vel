@@ -67,7 +67,7 @@
 ##### 1. DATA PREPERATION #####
 ##### (Change the path to a desired glacier folder) ---
 
-# Parent directory containing all glacier folders (Gl1, Gl2, ..., GlN)
+# Parent directory containing all glacier folders
 obs_data_path <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Inputs/Observations/Glacier 217 Flowline 7"
   setwd(obs_data_path)
   
@@ -147,7 +147,7 @@ obs_data_path <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Versi
     # Subset based on satellite and temporal conditions
     sub_data <- subset(data_filtered, 
                        (((satellite == "1A" | satellite == "1B") & 
-                           (as.numeric(date_dt..days.) > 8 & as.numeric(date_dt..days.) <= 30) & 
+                           (as.numeric(date_dt..days.) > 6 & as.numeric(date_dt..days.) <= 30) & 
                            ((mid_date < as.Date("2016-04-01")) | 
                               (mid_date >= as.Date("2016-10-01") & mid_date < as.Date("2017-04-01")) | 
                               (mid_date >= as.Date("2017-10-01") & mid_date < as.Date("2018-04-01")) |
@@ -156,7 +156,7 @@ obs_data_path <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Versi
                               (mid_date >= as.Date("2020-10-01") & mid_date < as.Date("2021-04-01")) |
                               (mid_date >= as.Date("2021-10-01")))) |
                           ((satellite == "2A" | satellite == "2B") & 
-                             (as.numeric(date_dt..days.) > 8 & as.numeric(date_dt..days.) <= 60))), 
+                             (as.numeric(date_dt..days.) > 16 & as.numeric(date_dt..days.) <= 60))), 
                        select = c("mid_date", "v..m.yr."))
     
     # Check if sub_data is empty
@@ -586,7 +586,7 @@ obs_data_path <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Versi
       # Check if the dataset has enough data points for spline fitting
       if (!is.null(dataset) && nrow(dataset) > 3) {
         # Fit a smooth spline to anomaly values with degrees of freedom (df) set to 40
-        fit <- smooth.spline(dataset$date, dataset$anomaly, df = 10, spar = 0.95)
+        fit <- smooth.spline(dataset$date, dataset$anomaly, df = 20, spar = 0.7)
         
         # Calculate residuals, sigma, and confidence intervals
         res <- (fit$yin - fit$y) / (1 - fit$lev)  # Calculate residuals
@@ -693,7 +693,7 @@ obs_data_path <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Versi
         # Only proceed if there are enough valid data points for spline fitting
         if (nrow(valid_data) > 3) {
           # Fit a smooth spline to residual anomaly values
-          fit <- smooth.spline(valid_data$date, valid_data$residual_anomaly, df = 10, spar = 0.95)
+          fit <- smooth.spline(valid_data$date, valid_data$residual_anomaly, df = 20, spar = 0.7)
           
           # Calculate residuals, sigma, and confidence intervals
           res <- (fit$yin - fit$y) / (1 - fit$lev)  # Calculate residuals

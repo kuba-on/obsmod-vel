@@ -68,12 +68,12 @@
 
 ##### 1. DATA PREPERATION #####
 
-# Parent directory containing all glacier folders (Gl1, Gl2, ..., GlN)
-parent_directory <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Jess ITS_LIVE v2/Inputs/Observations/v2"
+# Parent directory containing all glacier folders
+parent_directory <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Inputs/Observations/"
 
-# Get a list of all folders in the parent directory matching the pattern "Gl<number>"
+# Get a list of all folders in the parent directory matching the new pattern
 glacier_folders <- list.dirs(parent_directory, full.names = TRUE, recursive = FALSE)
-glacier_folders <- glacier_folders[grepl("Gl\\d+$", glacier_folders)]
+glacier_folders <- glacier_folders[grepl("^.*/Glacier \\d+ Flowline \\d+$", glacier_folders)]
 
 # Loop through each glacier folder
 for (obs_data_path in glacier_folders) {
@@ -83,14 +83,19 @@ for (obs_data_path in glacier_folders) {
   # Get the folder name (e.g., "Gl1")
   folder_name <- basename(obs_data_path)
   
+  # Extract Glacier and Flowline numbers using regular expression
+  parts <- strsplit(folder_name, " ")[[1]]
+  glacier_num <- as.integer(parts[2])
+  flowline_num <- as.integer(parts[4])
+  
   # Path to the CSV file that contains the mapping of ID to glacier names
-  csv_path <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Jess ITS_LIVE v2/glacier_name_jess.csv"
+  csv_path <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/New Points v3/Input/Box Coordinates/box_sp_all_v3.csv"
   
   # Read the CSV file
   glacier_info <- read.csv(csv_path)
   
   # Find the glacier name corresponding to the folder (ID)
-  glacier_name <- glacier_info$name[glacier_info$ID == folder_name]
+  glacier_name <- glacier_info$glacier_name[glacier_info$feature_ID == glacier_num]
   
   # Default to a generic name if no match is found
   if (length(glacier_name) == 0) {
@@ -151,7 +156,7 @@ for (obs_data_path in glacier_folders) {
     # Subset based on satellite and temporal conditions
     sub_data <- subset(data_filtered, 
                        (((satellite == "1A" | satellite == "1B") & 
-                           (as.numeric(date_dt..days.) > 8 & as.numeric(date_dt..days.) <= 30) & 
+                           (as.numeric(date_dt..days.) > 6 & as.numeric(date_dt..days.) <= 30) & 
                            ((mid_date < as.Date("2016-04-01")) | 
                               (mid_date >= as.Date("2016-10-01") & mid_date < as.Date("2017-04-01")) | 
                               (mid_date >= as.Date("2017-10-01") & mid_date < as.Date("2018-04-01")) |
@@ -160,7 +165,7 @@ for (obs_data_path in glacier_folders) {
                               (mid_date >= as.Date("2020-10-01") & mid_date < as.Date("2021-04-01")) |
                               (mid_date >= as.Date("2021-10-01")))) |
                           ((satellite == "2A" | satellite == "2B") & 
-                             (as.numeric(date_dt..days.) > 8 & as.numeric(date_dt..days.) <= 60))), 
+                             (as.numeric(date_dt..days.) > 16 & as.numeric(date_dt..days.) <= 60))), 
                        select = c("mid_date", "v..m.yr."))
     
     # Check if sub_data is empty
@@ -179,7 +184,7 @@ for (obs_data_path in glacier_folders) {
     
     # Get the file number from the file name
     # Extracting the last number from the filename using a corrected regex
-    file_number <- as.numeric(gsub("Gl\\d+_(\\d+)\\_itslive_v2_comb.csv", "\\1", file_name))  # Correctly capture the last number
+    file_number <- as.numeric(gsub("^gl_\\d+_\\d+_(\\d+)_itslive_v3_comb\\.csv$", "\\1", file_name))  # Capture the last number
     
     # Create yearly subsets
     yearly_subsets <- create_yearly_subsets(agg_data, file_number)
@@ -195,7 +200,7 @@ for (obs_data_path in glacier_folders) {
     
     # Define years and elevation bands to plot
     years <- c(2016, 2017, 2018, 2019, 2020, 2021)
-    elevations <- 1:15  # 15 possible elevation bands
+    elevations <- seq(100, 1500, by = 100)
     
     # Loop through each year and elevation band to plot the data
     for (year in years) {
@@ -218,7 +223,7 @@ for (obs_data_path in glacier_folders) {
         
         # Add elevation labels below the last row (for year 2021)
         if (year == 2021) {
-          mtext(paste("--", (elevation * 100), "m--", sep = ""), side = 1, line = 3, cex = 1.1)
+          mtext(paste("--", (elevation), "m--", sep = ""), side = 1, line = 3, cex = 1.1)
         }
       }
     }
@@ -304,7 +309,7 @@ for (obs_data_path in glacier_folders) {
   }
   
   # Automatically detect all files in the directory matching the pattern
-  file_names <- list.files(pattern = "^Gl\\d+_(\\d+)_itslive_v2_comb\\.csv$")
+  file_names <- list.files(pattern = "^gl_\\d+_\\d+_\\d+_itslive_v3_comb\\.csv$")
   
   # Sorting the files numerically (optional but ensures correct order)
   file_names <- file_names[order(as.numeric(gsub("\\D", "", file_names)))]
@@ -357,9 +362,9 @@ for (obs_data_path in glacier_folders) {
   
   
   
-  ##### MODEL DATA PROCESSING #####
+  ##### 3. MODEL DATA PROCESSING #####
   # Set the base path for model data
-  model_data_base_path <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Jess ITS_LIVE v2/Inputs/Model/v1"
+  model_data_base_path <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Inputs/Model/vel_fric2"
   
   # Get the corresponding model data path for the current folder
   model_data_path <- file.path(model_data_base_path, folder_name)
@@ -403,7 +408,7 @@ for (obs_data_path in glacier_folders) {
     
     # Set the date range
     date_start <- "2016-01-01"
-    date_end <- "2021-08-07"
+    date_end <- "2021-12-31"
     
     # Filter data by date range
     model_data_filtered <- subset(model_data, Calendar_Date >= as.Date(date_start) & Calendar_Date <= as.Date(date_end))
@@ -454,7 +459,7 @@ for (obs_data_path in glacier_folders) {
     interpolated_data$is_original <- interpolated_data$date %in% agg_model_data$date
     
     # Get the file number from the file name using the updated regex
-    file_number_model <- as.numeric(gsub("Gl\\d+_(\\d+)_model_v1.csv", "\\1", basename(file_name_model)))
+    file_number_model <- as.numeric(gsub("^gl_\\d+_\\d+_(\\d+)_vel_fric2_procd\\.csv$", "\\1", basename(file_name_model)))
     
     # Create yearly subsets with interpolated data
     yearly_subsets_model <- create_yearly_subsets_model(interpolated_data, file_number_model)
@@ -488,7 +493,7 @@ for (obs_data_path in glacier_folders) {
   }
   
   # Automatically detect all files in the directory matching the pattern
-  file_names_model <- list.files(model_data_path, pattern = "^Gl\\d+_\\d+_model_v1\\.csv$", full.names = TRUE)
+  file_names_model <- list.files(model_data_path, pattern = "^gl_\\d+_\\d+_\\d+_vel_fric2_procd\\.csv$", full.names = TRUE)
   
   # Sorting the files numerically (optional but ensures correct order)
   file_names_model <- file_names_model[order(as.numeric(gsub("\\D", "", file_names_model)))]
@@ -518,7 +523,7 @@ for (obs_data_path in glacier_folders) {
   } else {
     cat("No valid model data was processed. Check your files or filters.\n")
   }
-  ##### 4. RESIDUAL CALCULATION #####
+  ##### 4. RESIDUALS CALCULATION #####
   
   # Function to calculate residuals between observed and modeled anomalies
   calculate_residuals <- function(data_with_anomalies_obs, data_with_anomalies_model) {
@@ -590,7 +595,7 @@ for (obs_data_path in glacier_folders) {
       # Check if the dataset has enough data points for spline fitting
       if (!is.null(dataset) && nrow(dataset) > 3) {
         # Fit a smooth spline to anomaly values with degrees of freedom (df) set to 40
-        fit <- smooth.spline(dataset$date, dataset$anomaly, df = 10)
+        fit <- smooth.spline(dataset$date, dataset$anomaly, df = 20, spar = 0.7)
         
         # Calculate residuals, sigma, and confidence intervals
         res <- (fit$yin - fit$y) / (1 - fit$lev)  # Calculate residuals
@@ -626,7 +631,7 @@ for (obs_data_path in glacier_folders) {
     spline_fits_obs <- fit_spline_to_anomaly(data_with_anomalies_obs)
     
     # Print the spline fit for a specific elevation (e.g., year2018_4)
-    print(spline_fits_obs[["year2018_4"]])
+    print(spline_fits_obs[["year2018_400"]])
   }
   
   
@@ -679,7 +684,7 @@ for (obs_data_path in glacier_folders) {
     spline_fits_model <- fit_spline_to_anomaly_model(data_with_anomalies_model)
     
     # Print the spline fit for a specific elevation (e.g., year2018_4)
-    print(spline_fits_model[["year2018_4"]])
+    print(spline_fits_model[["year2018_400"]])
   }
   
   # Function to fit a spline to residual data
@@ -697,7 +702,7 @@ for (obs_data_path in glacier_folders) {
         # Only proceed if there are enough valid data points for spline fitting
         if (nrow(valid_data) > 3) {
           # Fit a smooth spline to residual anomaly values
-          fit <- smooth.spline(valid_data$date, valid_data$residual_anomaly, df = 10)
+          fit <- smooth.spline(valid_data$date, valid_data$residual_anomaly, df = 20, spar = 0.7)
           
           # Calculate residuals, sigma, and confidence intervals
           res <- (fit$yin - fit$y) / (1 - fit$lev)  # Calculate residuals
@@ -735,7 +740,7 @@ for (obs_data_path in glacier_folders) {
   if (exists("residuals_data") && length(residuals_data) > 0) {
     spline_fits_residuals <- fit_spline_to_residuals(residuals_data)
     
-    # Print the spline fit for a specific elevation (e.g., year2018_4)
+    # Print the spline fit for a specific elevation (e.g., year2018_400)
     example_key <- names(spline_fits_residuals)[1]
     if (!is.null(spline_fits_residuals[[example_key]])) {
       print(paste("Spline fit for residuals:", example_key))
@@ -744,17 +749,16 @@ for (obs_data_path in glacier_folders) {
   } else {
     cat("Residuals data is missing or empty. Splines cannot be calculated.\n")
   }
-
-
+  
   ##### 6. CALCULATING DRIVERS OF SEASONALITY (RATIOING) #####
   
   # Define years and elevation bands
   years <- 2016:2021
-  elevations <- 1:15  # Assuming 15 elevation bands
+  elevations <- seq(100, 1500, by = 100)  # Assuming 15 elevation bands
   
   # Initialize matrix for storing ratios
   ratio_matrix <- matrix(NA, nrow = length(years), ncol = length(elevations),
-                         dimnames = list(as.character(years), as.character(elevations * 100)))
+                         dimnames = list(as.character(years), as.character(elevations)))
   
   # Compute absolute areas for each year and elevation band
   for (year in years) {
@@ -805,24 +809,24 @@ for (obs_data_path in glacier_folders) {
       
       # Assign ratio, avoiding division by zero
       if (area_basal == 0) {
-        ratio_matrix[as.character(year), as.character(elevation * 100)] <- NA
+        ratio_matrix[as.character(year), as.character(elevation)] <- NA
       } else {
-        ratio_matrix[as.character(year), as.character(elevation * 100)] <- area_front / area_basal
+        ratio_matrix[as.character(year), as.character(elevation)] <- area_front / area_basal
       }
     }
   }
   
   # Save as CSV
-  output_dir <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Jess ITS_LIVE v2/Outputs/Ratios"
+  output_dir <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric2/Ratios"
   if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
-  csv_file_path <- file.path(output_dir, paste0(folder_name, "_ratio.csv"))
+  csv_file_path <- file.path(output_dir, paste0("gl_", glacier_num, "_", flowline_num, "_ratio_fric2.csv"))
   write.csv(ratio_matrix, file = csv_file_path, row.names = TRUE)
   cat("Ratio matrix saved at:", csv_file_path, "\n")
   
   
   
   # Define the subset name for year 2017, elevation 1
-  subset_name <- "year2017_1"
+  subset_name <- "year2017_100"
   
   # Retrieve spline fits for the given year and elevation
   spline_obs <- spline_fits_obs[[subset_name]]
@@ -845,14 +849,14 @@ for (obs_data_path in glacier_folders) {
     model_spline = model_values,
     residual_spline = residual_values
   ))
-
-
+  
+  
   
   ##### 7a. GRAPH OF OBS_MODEL ##### 
   
   # Define the path to save the PDF
-  pdf_file_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Jess ITS_LIVE v2/Outputs/Obs_Model",
-                             paste0(folder_name, "_om.pdf"))
+  pdf_file_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric2/Graphs/Obs-Mod",
+                             paste0("gl_", glacier_num, "_", flowline_num, "_om_fric2.pdf"))
   
   # Open a PDF device to save the plot (16x5 inches, landscape orientation)
   pdf(pdf_file_path, width = 18, height = 10)
@@ -863,7 +867,7 @@ for (obs_data_path in glacier_folders) {
   # Loop through each year (2016 to 2021)
   for (year in 2016:2021) {
     # Loop through each elevation band (1 to 15)
-    for (elevation in 1:15) {
+    for (elevation in seq(100, 1500, by = 100)) {
       # Retrieve spline fits and anomaly data
       spline_fit_obs <- spline_fits_obs[[paste0("year", year, "_", elevation)]]
       spline_fit_model <- spline_fits_model[[paste0("year", year, "_", elevation)]]
@@ -897,7 +901,7 @@ for (obs_data_path in glacier_folders) {
              yaxt = "n", xaxt = "n", pch = 1, col = adjustcolor("black", alpha.f = 0.5), cex = 0.5)
         
         # Set y-axis labels only for the first plot in each row (first elevation in the year)
-        if (elevation == 1) {
+        if (elevation == 100) {
           axis(2, at = c(y_min, 0, y_max), labels = c("-1.0", "0.0", "1.0"), las = 1)  # Y-axis labels
         }
         
@@ -963,7 +967,7 @@ for (obs_data_path in glacier_folders) {
         normalization_factor <- max(abs(c(subset_data_obs$anomaly, subset_data_model$anomaly)), na.rm = TRUE)
         
         # Annotate weighted mean and model mean
-        if (elevation == 1) {
+        if (elevation == 100) {
           mtext(paste0("w mean obs:"), side = 3, line = 1.7, cex = 0.6, col = "black", adj = 0)
           mtext(paste0("mean model:"), side = 3, line = 1, cex = 0.6, col = "red", adj = 0)
           mtext(paste0("norm factor:"), side = 3, line = 0.3, cex = 0.6, col = "grey40", adj = 0)
@@ -976,10 +980,10 @@ for (obs_data_path in glacier_folders) {
         # If data for this year and elevation is missing, plot a blank subplot
         plot(NULL, xlim = c(0, 1), ylim = c(-1, 1), type = "n", xaxt = "n", yaxt = "n", bty = "n")  # Blank plot
         box()  # Draw the outline around the blank plot
-        if (elevation == 1) {
+        if (elevation == 100) {
           axis(2, at = c(-1, 0, 1), labels = c("-1", "0", "1"), las = 1)  # Add a uniform y-axis to a blank plot
         }
-        if (elevation == 1) {
+        if (elevation == 100) {
           mtext(paste0("w mean obs:"), side = 3, line = 1.7, cex = 0.6, col = "black", adj = 0)
           mtext(paste0("mean model:"), side = 3, line = 1, cex = 0.6, col = "red", adj = 0)
           mtext(paste0("norm factor:"), side = 3, line = 0.3, cex = 0.6, col = "grey40", adj = 0)
@@ -990,14 +994,14 @@ for (obs_data_path in glacier_folders) {
       }
       
       # Optionally, add year label on the left margin next to the first plot in each row
-      if (elevation == 1) {
+      if (elevation == 100) {
         mtext(paste("----", year, "----", sep = ""), side = 2, line = 3, cex = 1.1)
         mtext("scaled anomaly", side = 2, line = 2.1, cex = 0.7)
       }
       
       # Optionally, add elevation labels below the last row of plots
       if (year == 2021) {
-        mtext(paste("--", (elevation * 100), "m--", sep = ""), side = 1, line = 3, cex = 1.1)
+        mtext(paste("--", (elevation), "m--", sep = ""), side = 1, line = 3, cex = 1.1)
       }
     }
   }
@@ -1005,7 +1009,7 @@ for (obs_data_path in glacier_folders) {
   # Global labels
   mtext("year of study", side = 2, line = 4, outer = TRUE, cex = 1.3)
   mtext("elevation band", side = 1, line = 4.5, outer = TRUE, cex = 1.3)
-  mtext(paste0(folder_name, " - ", glacier_name), side = 3, line = 0.5, outer = TRUE, cex = 1.5)
+  mtext(paste0(folder_name, " - ", glacier_name, ", fric2"), side = 3, line = 0.5, outer = TRUE, cex = 1.5)
   
   
   # Close the PDF device
@@ -1022,8 +1026,8 @@ for (obs_data_path in glacier_folders) {
   ##### 7b. GRAPH OF OBS_MODEL_RES ##### 
   
   # Define the path to save the PDF
-  pdf_file_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Jess ITS_LIVE v2/Outputs/Obs_Model_Res",
-                             paste0(folder_name, "_omr.pdf"))
+  pdf_file_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric2/Graphs/Obs-Mod-Res",
+                             paste0("gl_", glacier_num, "_", flowline_num, "_omr_fric2.pdf"))
   
   # Open a PDF device to save the plot (16x5 inches, landscape orientation)
   pdf(pdf_file_path, width = 18, height = 10)
@@ -1034,7 +1038,7 @@ for (obs_data_path in glacier_folders) {
   # Loop through each year (2016 to 2021)
   for (year in 2016:2021) {
     # Loop through each elevation band (1 to 15)
-    for (elevation in 1:15) {
+    for (elevation in seq(100, 1500, by = 100)) {
       # Retrieve spline fits and anomaly data
       spline_fit_obs <- spline_fits_obs[[paste0("year", year, "_", elevation)]]
       spline_fit_model <- spline_fits_model[[paste0("year", year, "_", elevation)]]
@@ -1071,7 +1075,7 @@ for (obs_data_path in glacier_folders) {
              yaxt = "n", xaxt = "n", pch = 1, col = adjustcolor("black", alpha.f = 0.5), cex = 0.5)
         
         # Set y-axis labels only for the first plot in each row (first elevation in the year)
-        if (elevation == 1) {
+        if (elevation == 100) {
           axis(2, at = c(y_min, 0, y_max), labels = c("-1.0", "0.0", "1.0"), las = 1)  # Y-axis labels
         }
         
@@ -1166,7 +1170,7 @@ for (obs_data_path in glacier_folders) {
         normalization_factor <- max(abs(c(subset_data_obs$anomaly, subset_data_model$anomaly, subset_residual_data$residual_anomaly)), na.rm = TRUE)
         
         # Annotate weighted mean and model mean
-        if (elevation == 1) {
+        if (elevation == 100) {
           mtext(paste0("w mean obs:"), side = 3, line = 1.7, cex = 0.6, col = "black", adj = 0)
           mtext(paste0("mean model:"), side = 3, line = 1, cex = 0.6, col = "red", adj = 0)
           #mtext(paste0("w mean res:"), side = 3, line = 1, cex = 0.6, col = "blue", adj = 0)
@@ -1182,10 +1186,10 @@ for (obs_data_path in glacier_folders) {
         # If data for this year and elevation is missing, plot a blank subplot
         plot(NULL, xlim = c(0, 1), ylim = c(-1, 1), type = "n", xaxt = "n", yaxt = "n", bty = "n")  # Blank plot
         box()  # Draw the outline around the blank plot
-        if (elevation == 1) {
+        if (elevation == 100) {
           axis(2, at = c(-1, 0, 1), labels = c("-1", "0", "1"), las = 1)  # Add a uniform y-axis to a blank plot
         }
-        if (elevation == 1) {
+        if (elevation == 100) {
           mtext(paste0("w mean obs:"), side = 3, line = 1.7, cex = 0.6, col = "black", adj = 0)
           mtext(paste0("mean model:"), side = 3, line = 1, cex = 0.6, col = "red", adj = 0)
           #mtext(paste0("w mean res:"), side = 3, line = 1, cex = 0.6, col = "blue", adj = 0)
@@ -1197,14 +1201,14 @@ for (obs_data_path in glacier_folders) {
       }
       
       # Optionally, add year label on the left margin next to the first plot in each row
-      if (elevation == 1) {
+      if (elevation == 100) {
         mtext(paste("----", year, "----", sep = ""), side = 2, line = 3, cex = 1.1)
         mtext("scaled anomaly", side = 2, line = 2.1, cex = 0.7)
       }
       
       # Optionally, add elevation labels below the last row of plots
       if (year == 2021) {
-        mtext(paste("--", (elevation * 100), "m--", sep = ""), side = 1, line = 3, cex = 1.1)
+        mtext(paste("--", (elevation), "m--", sep = ""), side = 1, line = 3, cex = 1.1)
       }
     }
   }
@@ -1212,7 +1216,7 @@ for (obs_data_path in glacier_folders) {
   # Global labels
   mtext("year of study", side = 2, line = 4, outer = TRUE, cex = 1.3)
   mtext("elevation band", side = 1, line = 4.5, outer = TRUE, cex = 1.3)
-  mtext(paste0(folder_name, " - ", glacier_name), side = 3, line = 0.5, outer = TRUE, cex = 1.5)
+  mtext(paste0(folder_name, " - ", glacier_name, ", fric2"), side = 3, line = 0.5, outer = TRUE, cex = 1.5)
   
   
   # Close the PDF device
@@ -1226,8 +1230,8 @@ for (obs_data_path in glacier_folders) {
   ##### 7c. RATIO HEATMAP #####
   
   # Define file path for the PDF
-  pdf_file_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Jess ITS_LIVE v2/Outputs/Heatmaps",
-                             paste0(folder_name, "_hm.pdf"))
+  pdf_file_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric2/Heatmaps/Regular",
+                             paste0("gl_", glacier_num, "_", flowline_num, "_hm_fric2.pdf"))
   
   # Open PDF device
   pdf(pdf_file_path, width = 9, height = 4)  # Increased width for legend space
@@ -1258,13 +1262,13 @@ for (obs_data_path in glacier_folders) {
        border = "black", lwd = 2)  # Adjust thickness as needed
   
   # Add axis labels with only tick marks (no long lines)
-  axis(1, at = 1:length(elevations), labels = paste0(elevations * 100, "m"), las = 2, tck = -0.04, lwd = 0, lwd.ticks = 1, cex.axis = 1)
+  axis(1, at = 1:length(elevations), labels = paste0(elevations, "m"), las = 2, tck = -0.04, lwd = 0, lwd.ticks = 1, cex.axis = 1)
   axis(2, at = 1:length(rev_years), labels = rev_years, las = 1, tck = -0.04, lwd = 0, lwd.ticks = 1, cex.axis = 1)
   
   #Global labels
   mtext("year of study", side = 2, line = 3, outer = TRUE, cex = 1.1)
   mtext("elevation band", side = 1, line = 3.5, outer = TRUE, cex = 1.1)
-  mtext(paste0(folder_name, " - ", glacier_name), side = 3, line = 0, outer = TRUE, cex = 1.3)
+  mtext(paste0(folder_name, " - ", glacier_name, ", fric2"), side = 3, line = 0, outer = TRUE, cex = 1.3)
   
   ### ADDING COLOR LEGEND ###
   par(mar = c(0.2, 0, 0.2, 3))  # Adjust margin for legend panel
@@ -1293,8 +1297,8 @@ for (obs_data_path in glacier_folders) {
   ##### RATIO BINARY HEATMAP #####
   
   ## Define file path for the PDF
-  pdf_file_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Jess ITS_LIVE v2/Outputs/Heatmaps Binary",
-                             paste0(folder_name, "_hmb.pdf"))  # Updated file name
+  pdf_file_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric2/Heatmaps/Binary",
+                             paste0("gl_", glacier_num, "_", flowline_num, "_hmb_fric2.pdf"))
   
   # Open PDF device
   pdf(pdf_file_path, width = 9, height = 4)  # Increased width for legend space
@@ -1325,13 +1329,13 @@ for (obs_data_path in glacier_folders) {
        border = "black", lwd = 2)  # Adjust thickness as needed
   
   # Add axis labels with only tick marks (no long lines)
-  axis(1, at = 1:length(elevations), labels = paste0(elevations * 100, "m"), las = 2, tck = -0.04, lwd = 0, lwd.ticks = 1, cex.axis = 1)
+  axis(1, at = 1:length(elevations), labels = paste0(elevations, "m"), las = 2, tck = -0.04, lwd = 0, lwd.ticks = 1, cex.axis = 1)
   axis(2, at = 1:length(rev_years), labels = rev_years, las = 1, tck = -0.04, lwd = 0, lwd.ticks = 1, cex.axis = 1)
   
   #Global labels
   mtext("year of study", side = 2, line = 3, outer = TRUE, cex = 1.1)
   mtext("elevation band", side = 1, line = 3.5, outer = TRUE, cex = 1.1)
-  mtext(paste0(folder_name, " - ", glacier_name), side = 3, line = 0, outer = TRUE, cex = 1.3)
+  mtext(paste0(folder_name, " - ", glacier_name, ", fric2"), side = 3, line = 0, outer = TRUE, cex = 1.3)
   
   ### ADDING COLOR LEGEND ###
   par(mar = c(0.2, 0, 0.2, 3))  # Adjust margin for legend panel
@@ -1356,5 +1360,6 @@ for (obs_data_path in glacier_folders) {
   cat("Heatmap saved as PDF at:", pdf_file_path, "\n")
   
   cat("Processed glacier folder:", folder_name, "\n")
+  
   
 }
