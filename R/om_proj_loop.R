@@ -154,6 +154,7 @@ for (obs_data_path in glacier_folders) {
     }
     
     # Subset based on satellite and temporal conditions
+    # Subset based on satellite and temporal conditions
     sub_data <- subset(data_filtered, 
                        (((satellite == "1A" | satellite == "1B") & 
                            (as.numeric(date_dt..days.) > 6 & as.numeric(date_dt..days.) <= 30) & 
@@ -166,7 +167,7 @@ for (obs_data_path in glacier_folders) {
                               (mid_date >= as.Date("2021-10-01")))) |
                           ((satellite == "2A" | satellite == "2B") & 
                              (as.numeric(date_dt..days.) > 16 & as.numeric(date_dt..days.) <= 60))), 
-                       select = c("mid_date", "v..m.yr."))
+                       select = c("mid_date", "v..m.yr.", "v_error..m.yr."))
     
     # Check if sub_data is empty
     if (nrow(sub_data) == 0) {
@@ -174,10 +175,14 @@ for (obs_data_path in glacier_folders) {
       return(NULL)
     }
     
-    # Convert velocity to numeric and aggregate by mean daily velocity
+    # Convert velocity and error to numeric
     sub_data$v..m.yr. <- as.numeric(sub_data$v..m.yr.)
-    agg_data <- aggregate(sub_data$v..m.yr., by = list(sub_data$mid_date), FUN = mean)
-    colnames(agg_data) <- c("date", "vel")
+    sub_data$v_error..m.yr. <- as.numeric(sub_data$v_error..m.yr.)
+    
+    # Aggregate by mean daily values (velocity and error)
+    agg_data <- aggregate(cbind(sub_data$v..m.yr., sub_data$v_error..m.yr.), 
+                          by = list(sub_data$mid_date), FUN = mean, na.rm = TRUE)
+    colnames(agg_data) <- c("date", "vel", "vel_error")
     
     # Extract year from the date and add a separate column
     agg_data$year <- as.numeric(format(agg_data$date, "%Y"))
@@ -330,11 +335,6 @@ for (obs_data_path in glacier_folders) {
   
   # Check if any data was processed
   if (length(all_data) > 0) {
-    # Combine all processed data into a single data frame if needed
-    combined_data <- do.call(rbind, lapply(all_data, function(x) x[, c("date", "vel", "year", "norm_vel")]))
-    
-    # Print the first few rows of the combined data to check
-    head(combined_data)
     
     # Plot boxplots for all yearly subsets after processing
     plot_boxplots(all_data)
@@ -359,12 +359,24 @@ for (obs_data_path in glacier_folders) {
     cat("No valid data was processed. Check your files or filters.\n")
   }
   
+  # Save anomalies data as RDS
+  rds_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/data/RDS/obs",
+                        paste0("gl_", glacier_num, "_", flowline_num, "_data_obs.rds"))
+  saveRDS(data_with_anomalies_obs, rds_path)
+  cat("Saved RDS file to:", rds_path, "\n")
+  
+  # Save anomalies data as MS Excel with multiple sheets
+  library(openxlsx)
+  xlsx_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/data/XLSX/obs",
+                         paste0("gl_", glacier_num, "_", flowline_num, "_data_obs.xlsx"))
+  write.xlsx(data_with_anomalies_obs, file = xlsx_path)
+  cat("Saved Excel file to:", xlsx_path, "\n")
   
   
   
   ##### 3. MODEL DATA PROCESSING #####
   # Set the base path for model data
-  model_data_base_path <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Inputs/Model/vel_fric2"
+  model_data_base_path <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Inputs/Model/vel_fric1"
   
   # Get the corresponding model data path for the current folder
   model_data_path <- file.path(model_data_base_path, folder_name)
@@ -459,7 +471,7 @@ for (obs_data_path in glacier_folders) {
     interpolated_data$is_original <- interpolated_data$date %in% agg_model_data$date
     
     # Get the file number from the file name using the updated regex
-    file_number_model <- as.numeric(gsub("^gl_\\d+_\\d+_(\\d+)_vel_fric2_procd\\.csv$", "\\1", basename(file_name_model)))
+    file_number_model <- as.numeric(gsub("^gl_\\d+_\\d+_(\\d+)_vel_fric1_procd\\.csv$", "\\1", basename(file_name_model)))
     
     # Create yearly subsets with interpolated data
     yearly_subsets_model <- create_yearly_subsets_model(interpolated_data, file_number_model)
@@ -493,7 +505,7 @@ for (obs_data_path in glacier_folders) {
   }
   
   # Automatically detect all files in the directory matching the pattern
-  file_names_model <- list.files(model_data_path, pattern = "^gl_\\d+_\\d+_\\d+_vel_fric2_procd\\.csv$", full.names = TRUE)
+  file_names_model <- list.files(model_data_path, pattern = "^gl_\\d+_\\d+_\\d+_vel_fric1_procd\\.csv$", full.names = TRUE)
   
   # Sorting the files numerically (optional but ensures correct order)
   file_names_model <- file_names_model[order(as.numeric(gsub("\\D", "", file_names_model)))]
@@ -523,6 +535,22 @@ for (obs_data_path in glacier_folders) {
   } else {
     cat("No valid model data was processed. Check your files or filters.\n")
   }
+  
+  # Save anomalies data as RDS
+  rds_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/data/RDS/fric1",
+                        paste0("gl_", glacier_num, "_", flowline_num, "_data_fric1.rds"))
+  saveRDS(data_with_anomalies_model, rds_path)
+  cat("Saved RDS file to:", rds_path, "\n")
+  
+  # Save anomalies data as MS Excel with multiple sheets
+  library(openxlsx)
+  xlsx_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/data/XLSX/fric1",
+                         paste0("gl_", glacier_num, "_", flowline_num, "_data_fric1.xlsx"))
+  write.xlsx(data_with_anomalies_model, file = xlsx_path)
+  cat("Saved Excel file to:", xlsx_path, "\n")
+  
+  
+  
   ##### 4. RESIDUALS CALCULATION #####
   
   # Function to calculate residuals between observed and modeled anomalies
@@ -550,7 +578,7 @@ for (obs_data_path in glacier_folders) {
                                      merged_data$vel_obs - merged_data$vel_model,
                                      NA)  # Assign NA if either anomaly is missing
       
-      # Calculate the max absolute value for normalization, ignoring NA values
+      # Calculate the max absolute value for normalisation, ignoring NA values
       max_abs_residual <- max(abs(merged_data$residual_anomaly), na.rm = TRUE)
       
       # Handle the case where max_abs_residual is NA (i.e., all values are NA)
@@ -581,6 +609,20 @@ for (obs_data_path in glacier_folders) {
   } else {
     cat("Observational or modeled data with anomalies is missing. Residuals cannot be calculated.\n")
   }
+  
+  # Save residual data as RDS
+  rds_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/data/RDS/res_fric1",
+                        paste0("gl_", glacier_num, "_", flowline_num, "_data_res_fric1.rds"))
+  saveRDS(residuals_data, rds_path)
+  cat("Saved RDS file to:", rds_path, "\n")
+  
+  # Save residual data as MS Excel with multiple sheets
+  library(openxlsx)
+  xlsx_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/data/XLSX/res",
+                         paste0("gl_", glacier_num, "_", flowline_num, "_data_res_fric1.xlsx"))
+  write.xlsx(residuals_data, file = xlsx_path)
+  cat("Saved Excel file to:", xlsx_path, "\n")
+  
   
   ##### 5. SPLINE FITTING #####
   
@@ -817,9 +859,9 @@ for (obs_data_path in glacier_folders) {
   }
   
   # Save as CSV
-  output_dir <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric2/Ratios"
+  output_dir <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Ratios"
   if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
-  csv_file_path <- file.path(output_dir, paste0("gl_", glacier_num, "_", flowline_num, "_ratio_fric2.csv"))
+  csv_file_path <- file.path(output_dir, paste0("gl_", glacier_num, "_", flowline_num, "_ratio.csv"))
   write.csv(ratio_matrix, file = csv_file_path, row.names = TRUE)
   cat("Ratio matrix saved at:", csv_file_path, "\n")
   
@@ -855,8 +897,8 @@ for (obs_data_path in glacier_folders) {
   ##### 7a. GRAPH OF OBS_MODEL ##### 
   
   # Define the path to save the PDF
-  pdf_file_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric2/Graphs/Obs-Mod",
-                             paste0("gl_", glacier_num, "_", flowline_num, "_om_fric2.pdf"))
+  pdf_file_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Graphs/Obs-Mod",
+                             paste0("gl_", glacier_num, "_", flowline_num, "_om_fric1.pdf"))
   
   # Open a PDF device to save the plot (16x5 inches, landscape orientation)
   pdf(pdf_file_path, width = 18, height = 10)
@@ -956,25 +998,34 @@ for (obs_data_path in glacier_folders) {
           }
         }
         
-        # Calculate the weighted mean for observations
+        # Calculate weighted mean for observations
         if (!is.null(subset_data_obs$vel) && !is.null(subset_data_obs$weight)) {
           weighted_mean_obs <- weighted.mean(subset_data_obs$vel, w = subset_data_obs$weight, na.rm = TRUE)
         } else {
           weighted_mean_obs <- NA
         }
         
-        mean_model <- if (!is.null(subset_data_model)) mean(subset_data_model$vel, na.rm = TRUE) else NA
-        normalization_factor <- max(abs(c(subset_data_obs$anomaly, subset_data_model$anomaly)), na.rm = TRUE)
+        #Calculate weighted mean for error
+        if (!is.null(subset_data_obs$vel_error) && !is.null(subset_data_obs$weight)) {
+          weighted_mean_error <- weighted.mean(subset_data_obs$vel_error, w = subset_data_obs$weight, na.rm = TRUE)
+        } else {
+          weighted_mean_error <- NA
+        }
+        weighted_mean_error_prt <- (weighted_mean_error / weighted_mean_obs) * 100
         
-        # Annotate weighted mean and model mean
+        #Calculate mean for model and normalisation factor
+        mean_model <- if (!is.null(subset_data_model)) mean(subset_data_model$vel, na.rm = TRUE) else NA
+        normalisation_factor <- max(abs(c(subset_data_obs$anomaly, subset_data_model$anomaly)), na.rm = TRUE)
+        
+        # Annotate means
         if (elevation == 100) {
           mtext(paste0("w mean obs:"), side = 3, line = 1.7, cex = 0.6, col = "black", adj = 0)
           mtext(paste0("mean model:"), side = 3, line = 1, cex = 0.6, col = "red", adj = 0)
           mtext(paste0("norm factor:"), side = 3, line = 0.3, cex = 0.6, col = "grey40", adj = 0)
         }
-        mtext(paste0(round(weighted_mean_obs, 0)), side = 3, line = 1.7, cex = 0.6, col = "black", adj = 1)
+        mtext(paste0(round(weighted_mean_obs, 0), "\u00B1", round(weighted_mean_error_prt, 0), "%"), side = 3, line = 1.7, cex = 0.6, col = "black", adj = 1)
         mtext(paste0(round(mean_model, 0)), side = 3, line = 1, cex = 0.6, col = "red", adj = 1)
-        mtext(paste0(round(normalization_factor, 0)), side = 3, line = 0.3, cex = 0.6, col = "grey40", adj = 1)
+        mtext(paste0(round(normalisation_factor, 0)), side = 3, line = 0.3, cex = 0.6, col = "grey40", adj = 1)
         
       } else {
         # If data for this year and elevation is missing, plot a blank subplot
@@ -1009,7 +1060,7 @@ for (obs_data_path in glacier_folders) {
   # Global labels
   mtext("year of study", side = 2, line = 4, outer = TRUE, cex = 1.3)
   mtext("elevation band", side = 1, line = 4.5, outer = TRUE, cex = 1.3)
-  mtext(paste0(folder_name, " - ", glacier_name, ", fric2"), side = 3, line = 0.5, outer = TRUE, cex = 1.5)
+  mtext(paste0(folder_name, " -glacier_name ", glacier_name), side = 3, line = 0.5, outer = TRUE, cex = 1.5)
   
   
   # Close the PDF device
@@ -1023,11 +1074,11 @@ for (obs_data_path in glacier_folders) {
   
   
   
-  ##### 7b. GRAPH OF OBS_MODEL_RES ##### 
+  ##### 7b. GRAPH OF OBS_MODEL_RES #####
   
   # Define the path to save the PDF
-  pdf_file_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric2/Graphs/Obs-Mod-Res",
-                             paste0("gl_", glacier_num, "_", flowline_num, "_omr_fric2.pdf"))
+  pdf_file_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Graphs/Obs-Mod-Res",
+                             paste0("gl_", glacier_num, "_", flowline_num, "_omr_fric1.pdf"))
   
   # Open a PDF device to save the plot (16x5 inches, landscape orientation)
   pdf(pdf_file_path, width = 18, height = 10)
@@ -1152,24 +1203,33 @@ for (obs_data_path in glacier_folders) {
         }
         
         
-        # Calculate the weighted mean for observations
+        # Calculate weighted mean for observations
         if (!is.null(subset_data_obs$vel) && !is.null(subset_data_obs$weight)) {
           weighted_mean_obs <- weighted.mean(subset_data_obs$vel, w = subset_data_obs$weight, na.rm = TRUE)
         } else {
           weighted_mean_obs <- NA
         }
         
-        # Calculate the weighted mean for residuals
+        #Calculate weighted mean for error
+        if (!is.null(subset_data_obs$vel_error) && !is.null(subset_data_obs$weight)) {
+          weighted_mean_error <- weighted.mean(subset_data_obs$vel_error, w = subset_data_obs$weight, na.rm = TRUE)
+        } else {
+          weighted_mean_error <- NA
+        }
+        weighted_mean_error_prt <- (weighted_mean_error / weighted_mean_obs) * 100
+        
+        # Calculate weighted mean for residuals
         if (!is.null(subset_residual_data$residual) && !is.null(subset_residual_data$weight)) {
           weighted_mean_res <- weighted.mean(subset_residual_data$residual, w = subset_residual_data$weight, na.rm = TRUE)
         } else {
           weighted_mean_res <- NA
         }
         
+        # Calculate mean for models and normalisation factor
         mean_model <- if (!is.null(subset_data_model)) mean(subset_data_model$vel, na.rm = TRUE) else NA
-        normalization_factor <- max(abs(c(subset_data_obs$anomaly, subset_data_model$anomaly, subset_residual_data$residual_anomaly)), na.rm = TRUE)
+        normalisation_factor <- max(abs(c(subset_data_obs$anomaly, subset_data_model$anomaly, subset_residual_data$residual_anomaly)), na.rm = TRUE)
         
-        # Annotate weighted mean and model mean
+        # Annotate means
         if (elevation == 100) {
           mtext(paste0("w mean obs:"), side = 3, line = 1.7, cex = 0.6, col = "black", adj = 0)
           mtext(paste0("mean model:"), side = 3, line = 1, cex = 0.6, col = "red", adj = 0)
@@ -1177,10 +1237,10 @@ for (obs_data_path in glacier_folders) {
           mtext(paste0("norm factor:"), side = 3, line = 0.3, cex = 0.6, col = "grey40", adj = 0)
         } 
         
-        mtext(paste0(round(weighted_mean_obs, 0)), side = 3, line = 1.7, cex = 0.6, col = "black", adj = 1)
+        mtext(paste0(round(weighted_mean_obs, 0), "\u00B1", round(weighted_mean_error_prt, 0), "%"), side = 3, line = 1.7, cex = 0.6, col = "black", adj = 1)
         mtext(paste0(round(mean_model, 0)), side = 3, line = 1, cex = 0.6, col = "red", adj = 1)
         #mtext(paste0(round(weighted_mean_res, 0)), side = 3, line = 1, cex = 0.6, col = "blue", adj = 1)
-        mtext(paste0(round(normalization_factor, 0)), side = 3, line = 0.3, cex = 0.6, col = "grey40", adj = 1)
+        mtext(paste0(round(normalisation_factor, 0)), side = 3, line = 0.3, cex = 0.6, col = "grey40", adj = 1)
         
       } else {
         # If data for this year and elevation is missing, plot a blank subplot
@@ -1216,7 +1276,7 @@ for (obs_data_path in glacier_folders) {
   # Global labels
   mtext("year of study", side = 2, line = 4, outer = TRUE, cex = 1.3)
   mtext("elevation band", side = 1, line = 4.5, outer = TRUE, cex = 1.3)
-  mtext(paste0(folder_name, " - ", glacier_name, ", fric2"), side = 3, line = 0.5, outer = TRUE, cex = 1.5)
+  mtext(paste0(folder_name, " - ", glacier_name), side = 3, line = 0.5, outer = TRUE, cex = 1.5)
   
   
   # Close the PDF device
@@ -1230,8 +1290,8 @@ for (obs_data_path in glacier_folders) {
   ##### 7c. RATIO HEATMAP #####
   
   # Define file path for the PDF
-  pdf_file_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric2/Heatmaps/Regular",
-                             paste0("gl_", glacier_num, "_", flowline_num, "_hm_fric2.pdf"))
+  pdf_file_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Heatmaps/Regular",
+                             paste0("gl_", glacier_num, "_", flowline_num, "_hm_fric1.pdf"))
   
   # Open PDF device
   pdf(pdf_file_path, width = 9, height = 4)  # Increased width for legend space
@@ -1268,7 +1328,7 @@ for (obs_data_path in glacier_folders) {
   #Global labels
   mtext("year of study", side = 2, line = 3, outer = TRUE, cex = 1.1)
   mtext("elevation band", side = 1, line = 3.5, outer = TRUE, cex = 1.1)
-  mtext(paste0(folder_name, " - ", glacier_name, ", fric2"), side = 3, line = 0, outer = TRUE, cex = 1.3)
+  mtext(paste0(folder_name, " - ", glacier_name), side = 3, line = 0, outer = TRUE, cex = 1.3)
   
   ### ADDING COLOR LEGEND ###
   par(mar = c(0.2, 0, 0.2, 3))  # Adjust margin for legend panel
@@ -1294,11 +1354,11 @@ for (obs_data_path in glacier_folders) {
   cat("Heatmap saved as PDF at:", pdf_file_path, "\n")
   
   
-  ##### RATIO BINARY HEATMAP #####
+  ##### 7d. RATIO BINARY HEATMAP #####
   
   ## Define file path for the PDF
-  pdf_file_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric2/Heatmaps/Binary",
-                             paste0("gl_", glacier_num, "_", flowline_num, "_hmb_fric2.pdf"))
+  pdf_file_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Heatmaps/Binary",
+                             paste0("gl_", glacier_num, "_", flowline_num, "_hmb_fric1.pdf"))
   
   # Open PDF device
   pdf(pdf_file_path, width = 9, height = 4)  # Increased width for legend space
@@ -1335,7 +1395,7 @@ for (obs_data_path in glacier_folders) {
   #Global labels
   mtext("year of study", side = 2, line = 3, outer = TRUE, cex = 1.1)
   mtext("elevation band", side = 1, line = 3.5, outer = TRUE, cex = 1.1)
-  mtext(paste0(folder_name, " - ", glacier_name, ", fric2"), side = 3, line = 0, outer = TRUE, cex = 1.3)
+  mtext(paste0(folder_name, " - ", glacier_name), side = 3, line = 0, outer = TRUE, cex = 1.3)
   
   ### ADDING COLOR LEGEND ###
   par(mar = c(0.2, 0, 0.2, 3))  # Adjust margin for legend panel
