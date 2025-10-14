@@ -2,63 +2,70 @@
 
 # The code below processes observational and modelled ice velocity data in a loop. The processing includes:
 # 1. Data preparation: 
-  # - reading glacier folders and mapping glacier names.
+# - reading glacier folder and mapping glacier name.
 
 # 2. Observational data processing: 
-  ### process_data function: 
-  # - loads observational data, 
-  # - filters data by date range, satellites, and time seperation between acquisition dates, 
-  # - aggregates data by mean daily velocity.
-  ### remove_outliers function:
-  # - removes outliers from the data using IQR criterion.
-  ### calculate_anomalies function:
-  # - calculates anomalies using weighted means by monthly means and counts,
-  # - normalises anomalies to the range [-1, 1].
-  ### plot_boxplots function:
-  # - plots boxplots of velocity data for each year and elevation band for initial visual inspection.
-  ### create_yearly_subsets function:
-  # - creates yearly subsets of the data, 
-  # - normalises velocity for each yearly subset.
+### process_data function: 
+# - loads observational data, 
+# - filters data by date range, satellites, and time seperation between acquisition dates, 
+# - aggregates data by mean daily velocity.
+### remove_outliers function:
+# - removes outliers from the data using IQR criterion.
+### calculate_anomalies function:
+# - calculates anomalies using weighted means by monthly means and counts,
+# - normalises anomalies to the range [-1, 1].
+### plot_boxplots function:
+# - plots boxplots of velocity data for each year and elevation band for initial visual inspection.
+### create_yearly_subsets function:
+# - creates yearly subsets of the data, 
+# - normalises velocity for each yearly subset.
 
 # 3. Model data processing:
-  # - gets model data corresponding to observational data for each glacier,
-  ### process_model_data function:
-  # - loads model data, 
-  # - filters by date range,
-  # - interpolates data to daily resolution using natural cubic spline,
-  # - distinguishes original modelled and interpolated data.
-  ### calculate_model_anomalies function:
-  # - calculates anomalies for model data and normalises them.
-  ### create_yearly_subsets_model function:
-  # - creates yearly subsets of the data,
-  # - normalises velocity for each yearly subset.
+# - gets model data corresponding to observational data,
+### process_model_data function:
+# - loads model data, 
+# - filters by date range,
+# - interpolates data to daily resolution using natural cubic spline,
+# - distinguishes original modelled and interpolated data.
+### calculate_model_anomalies function:
+# - calculates anomalies for model data and normalises them.
+### create_yearly_subsets_model function:
+# - creates yearly subsets of the data,
+# - normalises velocity for each yearly subset.
 
 # 4. Residuals calculation:
-  ### calculate_residuals function:
-  # - merges observational and modelled data by date,
-  # - calculates residual anomalies between observed and modeled anomalies,
-  # - normalises residual anomalies to the range [-1, 1].
+### calculate_residuals function:
+# - merges observational and modelled data by date,
+# - calculates residual anomalies between observed and modeled anomalies,
+# - normalises residual anomalies to the range [-1, 1].
 
 # 5. Spline fitting:
-  ### fit_spline_to_anomaly function:
-  # - fits a smooth spline to the observed anomaly data for each elevation—yearly subset with a specified global degree of freedom,
-  # - calculates residuals, standard deviation, and confidence intervals.
-  ### fit_spline_to_anomaly_model function:
-  # - fits a smooth spline to the modelled anomaly data for each elevation—yearly subset with a specified global degree of freedom,
-  # - calculates residuals, standard deviation, and confidence intervals.
-  ### fit_spline_to_residuals function:
-  # - fits a smooth spline to the residual anomaly data for each elevation—yearly subset with a specified global degree of freedom,
-  # - calculates residuals, standard deviation, and confidence intervals.
+### fit_spline_to_anomaly function:
+# - fits a smooth spline to the observed anomaly data for each elevation—yearly subset with a specified global degree of freedom,
+# - calculates residuals, standard deviation, and confidence intervals.
+### fit_spline_to_anomaly_model function:
+# - fits a smooth spline to the modelled anomaly data for each elevation—yearly subset with a specified global degree of freedom,
+# - calculates residuals, standard deviation, and confidence intervals.
+### fit_spline_to_residuals function:
+# - fits a smooth spline to the residual anomaly data for each elevation—yearly subset with a specified global degree of freedom,
+# - calculates residuals, standard deviation, and confidence intervals.
 
 # 6. Calculating drivers of seasonality (ratioing):
-  ### calculate_ratio function:
-  # - assigns ratio between absolute areas bounded by spline functions for each elevation—yearly subset,
-  # - returns ratio data centred at 1, estimating the dominant driver of seasonality in ice velocity (frontal vs fricitonal).
-  
-# 7. Graphing:
-  # - a: plots the spline fits for observed and modelled anomalies for each elevation—yearly subset as a subplot,
-  # - b: plots the spline fits for observed, modelled and residual anomalies for each elevation—yearly subset as a subplot,
-  # - c: plots the ratio data for each elevation—yearly subset as a heatmap and binary heatmap (frontal or frictional).
+### calculate_ratio function:
+# - assigns ratio between absolute areas bounded by spline functions for each elevation—yearly subset,
+# - returns ratio data centred at 1, estimating the dominant driver of seasonality in ice velocity (frontal vs fricitonal).
+
+# 7:  Calculating velocity types (CADI index)
+# - identifies all positive (acceleration) and negative (deceleration) changes in ice velocity between adjacent spline nodes,
+# - integrates the magnitude and duration of each event (area under the velocity–time “triangle”),
+# - returns continuous acceleration–deceleration index (CADI), a ratio of acceleration to deceleration area, for each elevation—yearly subset.
+
+# 8. Graphing:
+# - a: plots the spline fits for observed and modelled anomalies for each elevation—yearly subset as a subplot,
+# - b: plots the spline fits for observed, modelled and residual anomalies for each elevation—yearly subset as a subplot,
+# - c: plots the spline fits for observed, modelled and residual anomalies for each elevation—yearly subset as a subplot, 
+# - d: plots the ratio data for each elevation—yearly subset as a heatmap (frontal or frictional),
+# - e: plots the ratio data for each elevation—yearly subset as a binary heatmap (frontal or frictional).
 
 #########################################
 
@@ -420,7 +427,7 @@ for (obs_data_path in glacier_folders) {
     
     # Set the date range
     date_start <- "2016-01-01"
-    date_end <- "2021-12-31"
+    date_end <- "2022-01-01"
     
     # Filter data by date range
     model_data_filtered <- subset(model_data, Calendar_Date >= as.Date(date_start) & Calendar_Date <= as.Date(date_end))
@@ -550,7 +557,6 @@ for (obs_data_path in glacier_folders) {
   cat("Saved Excel file to:", xlsx_path, "\n")
   
   
-  
   ##### 4. RESIDUALS CALCULATION #####
   
   # Function to calculate residuals between observed and modeled anomalies
@@ -618,7 +624,7 @@ for (obs_data_path in glacier_folders) {
   
   # Save residual data as MS Excel with multiple sheets
   library(openxlsx)
-  xlsx_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/data/XLSX/res",
+  xlsx_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/data/XLSX/res_fric1",
                          paste0("gl_", glacier_num, "_", flowline_num, "_data_res_fric1.xlsx"))
   write.xlsx(residuals_data, file = xlsx_path)
   cat("Saved Excel file to:", xlsx_path, "\n")
@@ -861,7 +867,7 @@ for (obs_data_path in glacier_folders) {
   # Save as CSV
   output_dir <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Ratios"
   if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
-  csv_file_path <- file.path(output_dir, paste0("gl_", glacier_num, "_", flowline_num, "_ratio.csv"))
+  csv_file_path <- file.path(output_dir, paste0("gl_", glacier_num, "_", flowline_num, "_ratio_fric1.csv"))
   write.csv(ratio_matrix, file = csv_file_path, row.names = TRUE)
   cat("Ratio matrix saved at:", csv_file_path, "\n")
   
@@ -894,7 +900,120 @@ for (obs_data_path in glacier_folders) {
   
   
   
-  ##### 7a. GRAPH OF OBS_MODEL ##### 
+  ##### 7. CALCULATING VELOCITY TYPES (CADI INDEX: OBS & RES) #####
+  
+  # Define years and elevation bands
+  years <- 2016:2021
+  elevations <- seq(100, 1500, by = 100)
+  
+  # Initialise matrices for CADI
+  cadi_matrix_obs <- matrix(NA, nrow = length(years), ncol = length(elevations),
+                            dimnames = list(as.character(years), as.character(elevations)))
+  cadi_matrix_res <- matrix(NA, nrow = length(years), ncol = length(elevations),
+                            dimnames = list(as.character(years), as.character(elevations)))
+  
+  # Loop through all years and elevations
+  for (year in years) {
+    for (elevation in elevations) {
+      subset_name <- paste0("year", year, "_", elevation)
+      
+      # Loop throigh observed velocity splines
+      if (subset_name %in% names(spline_fits_obs)) {
+        spline_obs <- spline_fits_obs[[subset_name]]
+        if (!is.null(spline_obs) && nrow(spline_obs) > 2) {
+          
+          # Select only melt-season spline nodes
+          spline_melt <- subset(spline_obs,
+                                date >= as.Date(paste0(year, "-05-01")) &
+                                  date <  as.Date(paste0(year, "-10-01")))
+          
+          if (nrow(spline_melt) > 1) {
+            # Extract time (days) and fitted values
+            t <- as.numeric(spline_melt$date)
+            v <- as.numeric(spline_melt$fitted_anomaly)
+            
+            # Optionally normalize to [0,1] for stability
+            v_min <- min(v, na.rm = TRUE)
+            v_max <- max(v, na.rm = TRUE)
+            if (is.finite(v_max - v_min) && (v_max - v_min) > 0) {
+              v <- (v - v_min) / (v_max - v_min)
+            }
+            
+            # Differences between adjacent spline nodes
+            dv <- diff(v)
+            dt <- diff(t)
+            L  <- max(t, na.rm = TRUE) - min(t, na.rm = TRUE)
+            
+            # Calculate area of each segment (½ * |Δv| * Δt / L)
+            accel_area <- sum(0.5 * dv[dv > 0] * dt[dv > 0], na.rm = TRUE) / L
+            decel_area <- sum(0.5 * abs(dv[dv < 0]) * dt[dv < 0], na.rm = TRUE) / L
+            
+            # Compute CADI (ratio of acceleration to deceleration area)
+            if (is.finite(accel_area) && is.finite(decel_area) && decel_area > 0) {
+              cadi_val <- accel_area / decel_area
+            } else {
+              cadi_val <- NA
+            }
+            
+            cadi_matrix_obs[as.character(year), as.character(elevation)] <- cadi_val
+          }
+        }
+      }
+      
+      ##### RESIDUAL SPLINES #####
+      if (subset_name %in% names(spline_fits_residuals)) {
+        spline_res <- spline_fits_residuals[[subset_name]]
+        if (!is.null(spline_res) && nrow(spline_res) > 2) {
+          
+          spline_melt_r <- subset(spline_res,
+                                  date >= as.Date(paste0(year, "-05-01")) &
+                                    date <  as.Date(paste0(year, "-10-01")))
+          
+          if (nrow(spline_melt_r) > 1) {
+            t_r <- as.numeric(spline_melt_r$date)
+            v_r <- as.numeric(spline_melt_r$fitted_residual)
+            
+            # Normalize residuals for comparability
+            v_min_r <- min(v_r, na.rm = TRUE)
+            v_max_r <- max(v_r, na.rm = TRUE)
+            if (is.finite(v_max_r - v_min_r) && (v_max_r - v_min_r) > 0) {
+              v_r <- (v_r - v_min_r) / (v_max_r - v_min_r)
+            }
+            
+            dv_r <- diff(v_r)
+            dt_r <- diff(t_r)
+            L_r  <- max(t_r, na.rm = TRUE) - min(t_r, na.rm = TRUE)
+            
+            accel_area_r <- sum(0.5 * dv_r[dv_r > 0] * dt_r[dv_r > 0], na.rm = TRUE) / L_r
+            decel_area_r <- sum(0.5 * abs(dv_r[dv_r < 0]) * dt_r[dv_r < 0], na.rm = TRUE) / L_r
+            
+            if (is.finite(accel_area_r) && is.finite(decel_area_r) && decel_area_r > 0) {
+              cadi_val_r <- accel_area_r / decel_area_r
+            } else {
+              cadi_val_r <- NA
+            }
+            
+            cadi_matrix_res[as.character(year), as.character(elevation)] <- cadi_val_r
+          }
+        }
+      }
+    }
+  }
+  
+  
+  types_obs_dir <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Types/Obs"
+  if (!dir.exists(types_obs_dir)) dir.create(types_obs_dir, recursive = TRUE)
+  csv_obs_path <- file.path(types_obs_dir, paste0("gl_", glacier_num, "_", flowline_num, "_ot_fric1.csv"))
+  write.csv(cadi_matrix_obs, csv_obs_path, row.names = TRUE)
+  cat("Observed CADI indices saved at:", csv_obs_path, "\n")
+  
+  types_res_dir <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Types/Res"
+  if (!dir.exists(types_res_dir)) dir.create(types_res_dir, recursive = TRUE)
+  csv_res_path <- file.path(types_res_dir, paste0("gl_", glacier_num, "_", flowline_num, "_rt_fric1.csv"))
+  write.csv(cadi_matrix_res, csv_res_path, row.names = TRUE)
+  cat("Residual CADI indices saved at:", csv_res_path, "\n")
+  
+  ##### 8a. GRAPH OF OBS_MODEL ##### 
   
   # Define the path to save the PDF
   pdf_file_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Graphs/Obs-Mod",
@@ -1060,13 +1179,13 @@ for (obs_data_path in glacier_folders) {
   # Global labels
   mtext("year of study", side = 2, line = 4, outer = TRUE, cex = 1.3)
   mtext("elevation band", side = 1, line = 4.5, outer = TRUE, cex = 1.3)
-  mtext(paste0(folder_name, " -glacier_name ", glacier_name), side = 3, line = 0.5, outer = TRUE, cex = 1.5)
+  mtext(paste0(folder_name, " - ", glacier_name), side = 3, line = 0.5, outer = TRUE, cex = 1.5)
   
   
   # Close the PDF device
   dev.off()
   
-  # Notify user of the output location
+  # Notify of the output location
   cat("Graph saved as PDF at:", pdf_file_path, "\n")
   
   
@@ -1074,7 +1193,7 @@ for (obs_data_path in glacier_folders) {
   
   
   
-  ##### 7b. GRAPH OF OBS_MODEL_RES #####
+  ##### 8b. GRAPH OF OBS_MODEL_RES #####
   
   # Define the path to save the PDF
   pdf_file_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Graphs/Obs-Mod-Res",
@@ -1282,12 +1401,243 @@ for (obs_data_path in glacier_folders) {
   # Close the PDF device
   dev.off()
   
-  # Notify user of the output location
+  # Notify of the output location
   cat("Graph saved as PDF at:", pdf_file_path, "\n")
   
   
   
-  ##### 7c. RATIO HEATMAP #####
+  ##### 8c. GRAPH OF OBS_MODEL_RES_TYPE #####
+  
+  # Load pre-saved CADI matrices (years as rows, elevations as columns)
+  types_obs_dir <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Types/Obs"
+  csv_obs_path  <- file.path(types_obs_dir, paste0("gl_", glacier_num, "_", flowline_num, "_ot_fric1.csv"))
+  cadi_matrix_obs <- as.matrix(read.csv(csv_obs_path, row.names = 1, check.names = FALSE))
+  
+  types_res_dir <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Types/Res"
+  csv_res_path  <- file.path(types_res_dir, paste0("gl_", glacier_num, "_", flowline_num, "_rt_fric1.csv"))
+  cadi_matrix_res <- as.matrix(read.csv(csv_res_path, row.names = 1, check.names = FALSE))
+  
+  # Define the path to save the PDF
+  pdf_file_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Graphs/Obs-Mod-Res-Type",
+                             paste0("gl_", glacier_num, "_", flowline_num, "_omrt_fric1.pdf"))
+  
+  # Open a PDF device to save the plot (16x5 inches, landscape orientation)
+  pdf(pdf_file_path, width = 18, height = 10)
+  
+  # Set up the plotting area: 6 rows, 15 columns
+  par(mfrow = c(6, 15), mar = c(0.2, 0.5, 3, 0.2), oma = c(6, 6, 3, 0))  # Added extra space in oma for top text
+  
+  # Loop through each year (2016 to 2021)
+  for (year in 2016:2021) {
+    # Loop through each elevation band (1 to 15)
+    for (elevation in seq(100, 1500, by = 100)) {
+      # Retrieve spline fits and anomaly data
+      spline_fit_obs <- spline_fits_obs[[paste0("year", year, "_", elevation)]]
+      spline_fit_model <- spline_fits_model[[paste0("year", year, "_", elevation)]]
+      subset_data_obs <- data_with_anomalies_obs[[paste0("year", year, "_", elevation)]]
+      subset_data_model <- data_with_anomalies_model[[paste0("year", year, "_", elevation)]]
+      subset_residual_data <- residuals_data[[paste0("year", year, "_", elevation)]]
+      spline_fit_residuals <- spline_fits_residuals[[paste0("year", year, "_", elevation)]]
+      
+      # Ensure anomalies are numeric
+      obs_anomalies <- as.numeric(subset_data_obs$anomaly)
+      model_anomalies <- as.numeric(subset_data_model$anomaly)
+      residual_anomalies <- as.numeric(subset_residual_data$residual_anomaly)
+      
+      # Remove NA values before calculating the max absolute anomaly
+      all_anomalies <- c(obs_anomalies, model_anomalies, residual_anomalies)
+      all_anomalies <- all_anomalies[!is.na(all_anomalies)]
+      
+      # Calculate the maximum absolute value of anomalies
+      if (length(all_anomalies) > 0) {
+        y_max_absolute <- max(abs(all_anomalies), na.rm = TRUE)
+      } else {
+        y_max_absolute <- 0  # Default if no valid anomalies are found
+      }
+      
+      # Set y-axis limits symmetrically around 0
+      y_min <- -y_max_absolute
+      y_max <- y_max_absolute
+      
+      if (!is.null(subset_data_obs) && !is.null(spline_fit_obs)) {
+        # Plot the anomaly points (observed anomalies over time)
+        plot(subset_data_obs$date, subset_data_obs$anomaly, xlab = "", ylab = "", main = "",
+             ylim = c(y_min, y_max),
+             xlim = as.Date(c(paste0(year, "-01-01"), paste0(year, "-12-31"))),
+             yaxt = "n", xaxt = "n", pch = 1,
+             col = adjustcolor("black", alpha.f = 0.5), cex = 0.5)
+        
+        # Set y-axis labels only for the first plot in each row
+        if (elevation == 100) {
+          axis(2, at = c(y_min, 0, y_max),
+               labels = c("-1.0", "0.0", "1.0"), las = 1)
+        }
+        
+        # Add X-axis only to the last row
+        if (year == 2021) {
+          axis.Date(1,
+                    at = seq.Date(as.Date(paste0(year, "-03-01")),
+                                  as.Date(paste0(year, "-11-30")), by = "4 months"),
+                    format = "%b", cex.axis = 1, las = 1)
+        }
+        
+        # Shade melt season (May to October)
+        rect(as.Date(paste0(year, "-05-01")), y_min,
+             as.Date(paste0(year, "-10-01")), y_max,
+             col = adjustcolor("lightblue", alpha.f = 0.18), border = NA)
+        
+        # Filter spline fits for the current year
+        spline_obs_filtered <- spline_fit_obs[
+          spline_fit_obs$date >= as.Date(paste0(year, "-01-01")) &
+            spline_fit_obs$date <= as.Date(paste0(year, "-12-31")), , drop = FALSE]
+        
+        # Add spline fits for observational data
+        if (!is.null(spline_obs_filtered) && nrow(spline_obs_filtered) > 0) {
+          polygon(c(spline_obs_filtered$date, rev(spline_obs_filtered$date)),
+                  c(spline_obs_filtered$upper, rev(spline_obs_filtered$lower)),
+                  col = adjustcolor("black", alpha.f = 0.15), border = NA)
+          lines(spline_obs_filtered$date,
+                spline_obs_filtered$fitted_anomaly,
+                col = "black", lwd = 1, lty = 1)
+        }
+        
+        # Plot modelled anomalies with differentiation between original and interpolated points
+        if (!is.null(spline_fit_model) && !is.null(subset_data_model)) {
+          # Separate original and interpolated points
+          original_points <- subset(subset_data_model, is_original == TRUE)
+          interpolated_points <- subset(subset_data_model, is_original == FALSE)
+          
+          # Plot interpolated points in red
+          if (nrow(interpolated_points) > 0) {
+            points(interpolated_points$date, interpolated_points$anomaly,
+                   pch = 1, col = adjustcolor("#ffb09c", alpha.f = 0.5), cex = 0.4)
+          }
+          
+          # Filter spline fits for the current year
+          spline_model_filtered <- spline_fit_model[
+            spline_fit_model$date >= as.Date(paste0(year, "-01-01")) &
+              spline_fit_model$date <= as.Date(paste0(year, "-12-31")), , drop = FALSE]
+          
+          if (!is.null(spline_model_filtered) && nrow(spline_model_filtered) > 0) {
+            polygon(c(spline_model_filtered$date, rev(spline_model_filtered$date)),
+                    c(spline_model_filtered$upper, rev(spline_model_filtered$lower)),
+                    col = adjustcolor("red", alpha.f = 0), border = NA)
+            lines(spline_model_filtered$date, spline_model_filtered$fitted_anomaly,
+                  col = adjustcolor("red", alpha.f = 0), lwd = 1, lty = 1)
+          }
+          
+          # Plot original points in red
+          if (nrow(original_points) > 0) {
+            points(original_points$date, original_points$anomaly,
+                   pch = 1, col = adjustcolor("red", alpha.f = 1), cex = 0.6)
+          }
+        }
+        
+        # Plot residual anomalies and spline fit
+        if (!is.null(subset_residual_data) && !is.null(spline_fit_residuals) > 0) {
+          # Plot the residual anomaly points
+          points(subset_residual_data$date, subset_residual_data$residual_anomaly,
+                 pch = 1, col = adjustcolor("blue", alpha.f = 0.5), cex = 0.5)
+        }
+        
+        # Add residual spline fit
+        if (!is.null(spline_fit_residuals)) {
+          spline_residuals_filtered <- spline_fit_residuals[
+            spline_fit_residuals$date >= as.Date(paste0(year, "-01-01")) &
+              spline_fit_residuals$date <= as.Date(paste0(year, "-12-31")), , drop = FALSE]
+          if (!is.null(spline_residuals_filtered) && nrow(spline_residuals_filtered) > 0) {
+            polygon(c(spline_residuals_filtered$date, rev(spline_residuals_filtered$date)),
+                    c(spline_residuals_filtered$upper, rev(spline_residuals_filtered$lower)),
+                    col = adjustcolor("blue", alpha.f = 0.15), border = NA)
+            lines(spline_residuals_filtered$date, spline_residuals_filtered$fitted_residual,
+                  col = "blue", lwd = 1, lty = 1)
+            abline(h = 0, lty = 3, lwd = 1, col = "black")
+          }
+        }
+        
+        # Calculate weighted mean for observations
+        if (!is.null(subset_data_obs$vel) && !is.null(subset_data_obs$weight)) {
+          weighted_mean_obs <- weighted.mean(subset_data_obs$vel, w = subset_data_obs$weight, na.rm = TRUE)
+        } else {
+          weighted_mean_obs <- NA
+        }
+        
+        #Calculate weighted mean for error
+        if (!is.null(subset_data_obs$vel_error) && !is.null(subset_data_obs$weight)) {
+          weighted_mean_error <- weighted.mean(subset_data_obs$vel_error, w = subset_data_obs$weight, na.rm = TRUE)
+        } else {
+          weighted_mean_error <- NA
+        }
+        weighted_mean_error_prt <- (weighted_mean_error / weighted_mean_obs) * 100
+        
+        # Calculate weighted mean for residuals
+        if (!is.null(subset_residual_data$residual) && !is.null(subset_residual_data$weight)) {
+          weighted_mean_res <- weighted.mean(subset_residual_data$residual, w = subset_residual_data$weight, na.rm = TRUE)
+        } else {
+          weighted_mean_res <- NA
+        }
+        
+        # Calculate mean for models and normalisation factor
+        mean_model <- if (!is.null(subset_data_model)) mean(subset_data_model$vel, na.rm = TRUE) else NA
+        normalisation_factor <- max(abs(c(subset_data_obs$anomaly,
+                                          subset_data_model$anomaly,
+                                          subset_residual_data$residual_anomaly)), na.rm = TRUE)
+        
+        # Display CADI values
+        cadi_obs_val <- tryCatch(cadi_matrix_obs[as.character(year), as.character(elevation)], error = function(e) NA)
+        cadi_res_val <- tryCatch(cadi_matrix_res[as.character(year), as.character(elevation)], error = function(e) NA)
+        
+        # Annotate CADI values
+        if (elevation == 100) {
+          mtext("CADI obs:", side = 3, line = 1.7, cex = 0.6, col = "black", adj = 0)
+          mtext("CADI res:", side = 3, line = 1.0, cex = 0.6, col = "blue",  adj = 0)
+          mtext("norm factor:", side = 3, line = 0.3, cex = 0.6, col = "grey40", adj = 0)
+        }
+        mtext(paste0(ifelse(is.finite(cadi_obs_val), formatC(cadi_obs_val, digits = 2, format = "f"), "NA")),
+              side = 3, line = 1.7, cex = 0.6, col = "black", adj = 1)
+        mtext(paste0(ifelse(is.finite(cadi_res_val), formatC(cadi_res_val, digits = 2, format = "f"), "NA")),
+              side = 3, line = 1.0, cex = 0.6, col = "blue",  adj = 1)
+        mtext(paste0(round(normalisation_factor, 0)), side = 3, line = 0.3, cex = 0.6, col = "grey40", adj = 1)
+        
+      } else {
+        # If data for this year and elevation is missing, plot a blank subplot
+        plot(NULL, xlim = c(0, 1), ylim = c(-1, 1), type = "n", xaxt = "n", yaxt = "n", bty = "n")
+        box()
+        if (elevation == 100) {
+          axis(2, at = c(-1, 0, 1), labels = c("-1", "0", "1"), las = 1)
+          mtext("CADI obs:", side = 3, line = 1.7, cex = 0.6, col = "black", adj = 0)
+          mtext("CADI res:", side = 3, line = 1.0, cex = 0.6, col = "blue",  adj = 0)
+          mtext("norm factor:", side = 3, line = 0.3, cex = 0.6, col = "grey40", adj = 0)
+        }
+        if (year == 2021) {
+          axis(1, at = c(0.1667, 0.5, 0.836), labels = c("Mar", "Jul", "Nov"), las = 1)
+        }
+      }
+      
+      # Optionally, add elevation labels below the last row of plots
+      if (elevation == 100) {
+        mtext(paste("----", year, "----", sep = ""), side = 2, line = 3, cex = 1.1)
+        mtext("scaled anomaly", side = 2, line = 2.1, cex = 0.7)
+      }
+      if (year == 2021) {
+        mtext(paste("--", elevation, "m--", sep = ""), side = 1, line = 3, cex = 1.1)
+      }
+    }
+  }
+  
+  # Global labels
+  mtext("year of study", side = 2, line = 4, outer = TRUE, cex = 1.3)
+  mtext("elevation band", side = 1, line = 4.5, outer = TRUE, cex = 1.3)
+  mtext(paste0(folder_name, " - ", glacier_name), side = 3, line = 0.5, outer = TRUE, cex = 1.5)
+  
+  # Close the PDF device
+  dev.off()
+  
+  # Notify of the output location
+  cat("Graph saved as PDF at:", pdf_file_path, "\n")
+  
+  
+  ##### 8d. RATIO HEATMAP #####
   
   # Define file path for the PDF
   pdf_file_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Heatmaps/Regular",
@@ -1298,7 +1648,7 @@ for (obs_data_path in glacier_folders) {
   par(mar = c(0.2, 0.2, 0.2, 2), oma = c(4.5, 4, 1.5, 0.5))  # Adjusted margin for legend
   
   # Convert to log scale for better visualization, avoiding -Inf
-  log_ratios <- log10(pmax(ratio_matrix, 10^-1))  # Clip small values at 10^-3
+  log_ratios <- log10(pmax(ratio_matrix, 10^-1))  # Clip small values at 10^-1
   
   # Define colors (blue for frontal-dominated, red for basal-dominated)
   breaks <- seq(-1, 1, length.out = 1000)  # Log scale
@@ -1351,10 +1701,11 @@ for (obs_data_path in glacier_folders) {
   # Close PDF device
   dev.off()
   
+  # Notify of the output location
   cat("Heatmap saved as PDF at:", pdf_file_path, "\n")
   
   
-  ##### 7d. RATIO BINARY HEATMAP #####
+  ##### 8e. RATIO BINARY HEATMAP #####
   
   ## Define file path for the PDF
   pdf_file_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Heatmaps/Binary",
@@ -1417,9 +1768,9 @@ for (obs_data_path in glacier_folders) {
   # Close PDF device
   dev.off()
   
+  # Notify of the output location
   cat("Heatmap saved as PDF at:", pdf_file_path, "\n")
   
   cat("Processed glacier folder:", folder_name, "\n")
-  
   
 }

@@ -81,7 +81,7 @@ for (input_dir in glacier_folders) {
   file_2_names <- list.files(input_dir, pattern = "_vel_fric2.csv$", full.names = TRUE)
   file_3_names <- list.files(input_dir, pattern = "_vel_fric3.csv$", full.names = TRUE)
   
-  # Process and sav file_1
+  # Process and save file_1
   for (file_1_name in file_1_names) {
     processed_data <- preprocess_file(file_1_name)
     new_filename <- paste0(tools::file_path_sans_ext(basename(file_1_name)), "_procd.csv")
