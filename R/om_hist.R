@@ -138,7 +138,7 @@ plot_overlay_hist <- function(x1, x3, x2,
                               col1 = "#648FFF", col2 = "#DC267F", col3 = "#FFB000",
                               alpha_fill = 0.35, alpha_border = 0.9,
                               main_label = "",
-                              legend_pos = "topright") {
+                              legend_pos = "topleft") {
   allx <- c(x1, x2, x3)
   allx <- allx[is.finite(allx) & allx > 0]
   if (length(allx) == 0) {
@@ -212,12 +212,13 @@ plot_overlay_hist <- function(x1, x3, x2,
   
   par(xpd = xpd_prev)
   
-  m1 <- if (length(x1)) mean(x1, na.rm = TRUE) else NA
-  m2 <- if (length(x2)) mean(x2, na.rm = TRUE) else NA
-  m3 <- if (length(x3)) mean(x3, na.rm = TRUE) else NA
+  m1 <- if (length(x1)) median(x1, na.rm = TRUE) else NA
+  m2 <- if (length(x2)) median(x2, na.rm = TRUE) else NA
+  m3 <- if (length(x3)) median(x3, na.rm = TRUE) else NA
   if (is.finite(m1) && m1 > 0) abline(v = log10(m1), col = col1, lty = 3, lwd = 2)
   if (is.finite(m2) && m2 > 0) abline(v = log10(m2), col = col2, lty = 3, lwd = 2)
   if (is.finite(m3) && m3 > 0) abline(v = log10(m3), col = col3, lty = 3, lwd = 2)
+  abline(v = 0, col = "black", lwd = 1)
   
   legend(legend_pos,
          legend = c("Budd, m=1", "Budd, m=6", "Schoof, m=3"),
@@ -319,6 +320,153 @@ for (fid in flow_ids) {
   pdf(file.path(out_flows, paste0(fid, "_hist.pdf")), width = 9, height = 6)
   par(mar = c(4, 4, 1, 1), oma = c(3.5, 4.5, 2, 1))
   plot_overlay_hist(x1, x2, x3, main_label = title_main)
+  dev.off()
+}
+
+########################################
+# 5) Friction-law-specific histograms (by elevation and by year)
+########################################
+
+# Helper: generate extra colors extending your base palette
+extend_palette <- function(base_cols, n) {
+  colorRampPalette(base_cols)(n)
+}
+
+# Helper: plot multiple histograms for a single friction law (colored by group)
+plot_multi_hist <- function(values_list, group_label, friction_label, base_cols) {
+  if (length(values_list) == 0) return(NULL)
+  
+  all_vals <- unlist(values_list, use.names = FALSE)
+  all_vals <- all_vals[is.finite(all_vals) & all_vals > 0]
+  if (length(all_vals) == 0) {
+    plot.new(); box(); mtext("No data", side = 3, line = 0.5, cex = 1)
+    return(invisible(NULL))
+  }
+  
+  lx_all <- log10(all_vals)
+  n_groups <- length(values_list)
+  group_names <- names(values_list)
+  cols <- extend_palette(base_cols, n_groups)
+  
+  breaks <- seq(floor(global_xrange[1]), ceiling(global_xrange[2]), by = 0.1)
+  ylim_max <- 0
+  
+  # precompute histograms
+  hists <- list()
+  for (i in seq_along(values_list)) {
+    lx <- log10(values_list[[i]][values_list[[i]] > 0])
+    h <- hist(lx, breaks = breaks, plot = FALSE)
+    hists[[i]] <- h
+    ylim_max <- max(ylim_max, max(h$counts))
+  }
+  
+  # plot base
+  plot(NA, xlim = range(breaks), ylim = c(0, ylim_max),
+       xlab = "", ylab = "", xaxt = "n", yaxt = "n", bty = "n")
+  box()
+  axis(2, las = 1)
+  xticks <- seq(floor(global_xrange[1]), ceiling(global_xrange[2]), by = 1)
+  axis(1, at = xticks, labels = parse(text = paste0("10^", xticks)))
+  mtext("frequency", side = 2, line = 3, cex = 1.1)
+  mtext("velocity driver, R", side = 1, line = 4.5, cex = 1.1)
+  
+  # draw histograms
+  for (i in seq_along(hists)) {
+    h <- hists[[i]]
+    rect(xleft = h$breaks[-length(h$breaks)], ybottom = 0,
+         xright = h$breaks[-1], ytop = h$counts,
+         col = adjustcolor(cols[i], alpha.f = 0.35),
+         border = adjustcolor(cols[i], alpha.f = 0.9))
+  }
+  
+  # --- Secondary inverted axis below main x-axis ---
+  usr <- par("usr")
+  xpd_prev <- par("xpd")
+  par(xpd = TRUE)
+  
+  axis_bottom_y <- usr[3] - 0.15 * diff(usr[3:4])  # vertical offset below x-axis
+  tick_length   <- 0.03 * diff(usr[3:4])
+  
+  x_min_tick <- min(xticks, na.rm = TRUE)
+  x_max_tick <- max(xticks, na.rm = TRUE)
+  
+  # Draw baseline
+  segments(x0 = x_min_tick, y0 = axis_bottom_y,
+           x1 = x_max_tick, y1 = axis_bottom_y, col = "black")
+  
+  # Ticks at 10^0 and both ends
+  ticks_x <- c(x_min_tick, 0, x_max_tick)
+  for (tx in ticks_x) {
+    segments(x0 = tx, y0 = axis_bottom_y,
+             x1 = tx, y1 = axis_bottom_y + tick_length, col = "black")
+  }
+  
+  # Labels: friction (left) vs front (right)
+  mid_left  <- (x_min_tick + 0) / 2
+  mid_right <- (x_max_tick + 0) / 2
+  
+  text(x = mid_left,  y = axis_bottom_y - 0.035 * diff(usr[3:4]),
+       labels = "friction", cex = 1, col = "black", font = 1)
+  text(x = mid_right, y = axis_bottom_y - 0.035 * diff(usr[3:4]),
+       labels = "front", cex = 1, col = "black", font = 1)
+  
+  par(xpd = xpd_prev)
+  
+  # --- Mean lines for each group ---
+  for (i in seq_along(values_list)) {
+    m <- median(values_list[[i]], na.rm = TRUE)
+    if (is.finite(m) && m > 0)
+      abline(v = log10(m), col = cols[i], lty = 3, lwd = 1.8)
+  }
+  abline(v = 0, col = "black", lwd = 1)
+  
+  legend("topleft",
+         legend = c("(m a.s.l.)", group_names),
+         fill = c(NA, adjustcolor(cols, alpha.f = 0.35)),
+         border = c(NA, adjustcolor(cols, alpha.f = 0.9)),
+         bty = "n",
+         ncol = 1,
+         text.col = c("black", rep("black", length(group_names))))
+  
+  mtext(paste0("Distribution of velocity drivers by ", group_label, ", ", friction_label),
+        side = 3, line = 0.5, outer = TRUE, cex = 1.4)
+}
+
+# --- Friction-law setup ---
+fric_sets <- list(fric1_list = fric1_list, fric2_list = fric2_list, fric3_list = fric3_list)
+fric_labels <- c("Budd, m=1","Schoof, m=3" , "Budd, m=6")
+fric_ids <- c("fric1", "fric2", "fric3")
+base_cols <- c("#648FFF", "#DC267F", "#FFB000")
+
+# --- Per-elevation, per-friction-law ---
+for (i in seq_along(fric_sets)) {
+  flist <- fric_sets[[i]]
+  friction_label <- fric_labels[i]
+  friction_id <- fric_ids[i]
+  
+  by_elev <- collect_by_elev(flist)
+  if (length(by_elev) == 0) next
+  
+  pdf(file.path(out_elevs, paste0("all_elevs_", friction_id, ".pdf")),
+      width = 9, height = 6)
+  par(mar = c(4, 4, 1, 1), oma = c(3.5, 4.5, 2, 1))
+  plot_multi_hist(by_elev, "elevation", friction_label, base_cols)
+  dev.off()
+}
+
+# --- Per-year, per-friction-law ---
+for (i in seq_along(fric_sets)) {
+  flist <- fric_sets[[i]]
+  friction_label <- fric_labels[i]
+  friction_id <- fric_ids[i]
+  
+  by_year <- collect_by_year(flist)
+  if (length(by_year) == 0) next
+  
+  pdf(file.path(out_years, paste0("all_years_", friction_id, ".pdf")),
+      width = 9, height = 6)
+  par(mar = c(4, 4, 1, 1), oma = c(3.5, 4.5, 2, 1))
+  plot_multi_hist(by_year, "year", friction_label, base_cols)
   dev.off()
 }
 
