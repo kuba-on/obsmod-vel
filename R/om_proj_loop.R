@@ -128,8 +128,8 @@ for (obs_data_path in glacier_folders) {
       # If the subset is empty, skip
       if (nrow(subset_data) == 0) next
       
-      # Normalize velocity for the subset
-      subset_data$norm_vel <- normalize_min_max(subset_data$vel)
+      # Normalise velocity for the subset
+      subset_data$norm_vel <- normalise_min_max(subset_data$vel)
       
       # Add the year and file number to the subset name
       subset_name <- paste0("year", yr, "_", file_number)  # Using file_number for output naming
@@ -230,7 +230,7 @@ for (obs_data_path in glacier_folders) {
         
         # Add year labels on the left of the first plot in each row (first elevation)
         if (elevation == 1) {
-          mtext(paste("----", year, "----", sep=""), side = 2, line = 3, cex = 1.1)
+          mtext(paste("---", year, "---", sep=""), side = 2, line = 3, cex = 1.1)
         }
         
         # Add elevation labels below the last row (for year 2021)
@@ -268,7 +268,7 @@ for (obs_data_path in glacier_folders) {
     return(cleaned_data)
   }
   
-  # Function to calculate and normalize anomalies for each element in cleaned_data separately
+  # Function to calculate and normalise anomalies for each element in cleaned_data separately
   calculate_anomalies <- function(cleaned_data) {
     cleaned_data_with_anomalies <- list()
     
@@ -306,10 +306,10 @@ for (obs_data_path in glacier_folders) {
         if (max_abs_anomaly > 0) {
           subset_data$norm_anomaly <- subset_data$anomaly / max_abs_anomaly
         } else {
-          subset_data$norm_anomaly <- 0  # If all anomalies are zero, set normalized anomalies to 0
+          subset_data$norm_anomaly <- 0  # If all anomalies are zero, set normalised anomalies to 0
         }
         
-        # Store the subset with anomalies and normalized anomalies
+        # Store the subset with anomalies and normalised anomalies
         cleaned_data_with_anomalies[[subset_name]] <- subset_data
       } else {
         # Retain empty subsets if any
@@ -326,7 +326,7 @@ for (obs_data_path in glacier_folders) {
   # Sorting the files numerically (optional but ensures correct order)
   file_names <- file_names[order(as.numeric(gsub("\\D", "", file_names)))]
   
-  # Initialize an empty list to store the processed data
+  # Initialise an empty list to store the processed data
   all_data <- list()
   
   # Loop through each file and process the data
@@ -405,8 +405,8 @@ for (obs_data_path in glacier_folders) {
       # If the subset is empty, skip
       if (nrow(subset_model_data) == 0) next
       
-      # Normalize velocity for the subset
-      subset_model_data$norm_vel <- normalize_min_max(subset_model_data$vel)
+      # Normalise velocity for the subset
+      subset_model_data$norm_vel <- normalise_min_max(subset_model_data$vel)
       
       # Add the year and file number to the subset name
       subset_name_model <- paste0("year", yr, "_", file_number_model)  # Using file_number for output naming
@@ -486,7 +486,7 @@ for (obs_data_path in glacier_folders) {
     return(yearly_subsets_model)
   }
   
-  # Function to calculate anomalies and normalize for cleaned model data
+  # Function to calculate anomalies and normalise for cleaned model data
   calculate_model_anomalies <- function(yearly_subsets_model) {
     cleaned_data_with_anomalies <- list()
     
@@ -501,7 +501,7 @@ for (obs_data_path in glacier_folders) {
         max_abs_anomaly <- max(abs(subset_data$anomaly), na.rm = TRUE)
         subset_data$norm_anomaly <- subset_data$anomaly / max_abs_anomaly
         
-        # Store the subset with anomalies and normalized anomalies
+        # Store the subset with anomalies and normalised anomalies
         cleaned_data_with_anomalies[[subset_name]] <- subset_data
       } else {
         cleaned_data_with_anomalies[[subset_name]] <- subset_data  # Retain empty subsets if any
@@ -517,7 +517,7 @@ for (obs_data_path in glacier_folders) {
   # Sorting the files numerically (optional but ensures correct order)
   file_names_model <- file_names_model[order(as.numeric(gsub("\\D", "", file_names_model)))]
   
-  # Initialize an empty list to store the processed data
+  # Initialise an empty list to store the processed data
   all_model_data <- list()
   
   # Loop through each file and process the data
@@ -531,7 +531,7 @@ for (obs_data_path in glacier_folders) {
   
   # Check if any model data was processed
   if (length(all_model_data) > 0) {
-    # Calculate anomalies and normalized anomalies after removing outliers
+    # Calculate anomalies and normalised anomalies after removing outliers
     data_with_anomalies_model <- calculate_model_anomalies(all_model_data)
     
     # Print the first few rows of an example subset with anomalies
@@ -561,7 +561,7 @@ for (obs_data_path in glacier_folders) {
   
   # Function to calculate residuals between observed and modeled anomalies
   calculate_residuals <- function(data_with_anomalies_obs, data_with_anomalies_model) {
-    residuals_data <- list()  # Initialize a list to store residual data
+    residuals_data <- list()  # Initialise a list to store residual data
     
     # Get all unique keys (e.g., year_elevation) that exist in both observed and modeled datasets
     common_keys <- intersect(names(data_with_anomalies_obs), names(data_with_anomalies_model))
@@ -591,7 +591,7 @@ for (obs_data_path in glacier_folders) {
       if (is.na(max_abs_residual) || max_abs_residual == 0) {
         merged_data$residual_norm_anomaly <- NA  # Assign NA if no valid residuals exist
       } else {
-        # Normalize residual anomalies to the range [-1, 1]
+        # Normalise residual anomalies to the range [-1, 1]
         merged_data$residual_norm_anomaly <- merged_data$residual_anomaly / max_abs_residual
       }
       
@@ -802,9 +802,9 @@ for (obs_data_path in glacier_folders) {
   
   # Define years and elevation bands
   years <- 2016:2021
-  elevations <- seq(100, 1500, by = 100)  # Assuming 15 elevation bands
+  elevations <- seq(100, 2100, by = 100)
   
-  # Initialize matrix for storing ratios
+  # Initialise matrix for storing ratios
   ratio_matrix <- matrix(NA, nrow = length(years), ncol = length(elevations),
                          dimnames = list(as.character(years), as.character(elevations)))
   
@@ -904,7 +904,7 @@ for (obs_data_path in glacier_folders) {
   
   # Define years and elevation bands
   years <- 2016:2021
-  elevations <- seq(100, 1500, by = 100)
+  elevations <- seq(100, 2100, by = 100)
   
   # Initialise matrices for CADI
   cadi_matrix_obs <- matrix(NA, nrow = length(years), ncol = length(elevations),
@@ -932,19 +932,12 @@ for (obs_data_path in glacier_folders) {
             t <- as.numeric(spline_melt$date)
             v <- as.numeric(spline_melt$fitted_anomaly)
             
-            # Optionally normalize to [0,1] for stability
-            v_min <- min(v, na.rm = TRUE)
-            v_max <- max(v, na.rm = TRUE)
-            if (is.finite(v_max - v_min) && (v_max - v_min) > 0) {
-              v <- (v - v_min) / (v_max - v_min)
-            }
-            
             # Differences between adjacent spline nodes
             dv <- diff(v)
             dt <- diff(t)
             L  <- max(t, na.rm = TRUE) - min(t, na.rm = TRUE)
             
-            # Calculate area of each segment (½ * |Δv| * Δt / L)
+            # Calculate area of each segment
             accel_area <- sum(0.5 * dv[dv > 0] * dt[dv > 0], na.rm = TRUE) / L
             decel_area <- sum(0.5 * abs(dv[dv < 0]) * dt[dv < 0], na.rm = TRUE) / L
             
@@ -960,11 +953,12 @@ for (obs_data_path in glacier_folders) {
         }
       }
       
-      ##### RESIDUAL SPLINES #####
+      # Loop through residual velocity splines
       if (subset_name %in% names(spline_fits_residuals)) {
         spline_res <- spline_fits_residuals[[subset_name]]
         if (!is.null(spline_res) && nrow(spline_res) > 2) {
           
+          # Select only melt-season spline nodes
           spline_melt_r <- subset(spline_res,
                                   date >= as.Date(paste0(year, "-05-01")) &
                                     date <  as.Date(paste0(year, "-10-01")))
@@ -973,20 +967,16 @@ for (obs_data_path in glacier_folders) {
             t_r <- as.numeric(spline_melt_r$date)
             v_r <- as.numeric(spline_melt_r$fitted_residual)
             
-            # Normalize residuals for comparability
-            v_min_r <- min(v_r, na.rm = TRUE)
-            v_max_r <- max(v_r, na.rm = TRUE)
-            if (is.finite(v_max_r - v_min_r) && (v_max_r - v_min_r) > 0) {
-              v_r <- (v_r - v_min_r) / (v_max_r - v_min_r)
-            }
-            
+            # Differences between adjacent spline nodes
             dv_r <- diff(v_r)
             dt_r <- diff(t_r)
             L_r  <- max(t_r, na.rm = TRUE) - min(t_r, na.rm = TRUE)
             
+            # Calculate area of each segment
             accel_area_r <- sum(0.5 * dv_r[dv_r > 0] * dt_r[dv_r > 0], na.rm = TRUE) / L_r
             decel_area_r <- sum(0.5 * abs(dv_r[dv_r < 0]) * dt_r[dv_r < 0], na.rm = TRUE) / L_r
             
+            # Compute CADI (ratio of acceleration to deceleration area)
             if (is.finite(accel_area_r) && is.finite(decel_area_r) && decel_area_r > 0) {
               cadi_val_r <- accel_area_r / decel_area_r
             } else {
@@ -1000,18 +990,20 @@ for (obs_data_path in glacier_folders) {
     }
   }
   
-  
+  # Save CADI matrices for observed velocities as CSV
   types_obs_dir <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Types/Obs"
   if (!dir.exists(types_obs_dir)) dir.create(types_obs_dir, recursive = TRUE)
   csv_obs_path <- file.path(types_obs_dir, paste0("gl_", glacier_num, "_", flowline_num, "_ot_fric1.csv"))
   write.csv(cadi_matrix_obs, csv_obs_path, row.names = TRUE)
   cat("Observed CADI indices saved at:", csv_obs_path, "\n")
   
+  # Save CADI matrices for residual velocities as CSV
   types_res_dir <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Types/Res"
   if (!dir.exists(types_res_dir)) dir.create(types_res_dir, recursive = TRUE)
   csv_res_path <- file.path(types_res_dir, paste0("gl_", glacier_num, "_", flowline_num, "_rt_fric1.csv"))
   write.csv(cadi_matrix_res, csv_res_path, row.names = TRUE)
   cat("Residual CADI indices saved at:", csv_res_path, "\n")
+  
   
   ##### 8a. GRAPH OF OBS_MODEL ##### 
   
@@ -1019,16 +1011,16 @@ for (obs_data_path in glacier_folders) {
   pdf_file_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Graphs/Obs-Mod",
                              paste0("gl_", glacier_num, "_", flowline_num, "_om_fric1.pdf"))
   
-  # Open a PDF device to save the plot (16x5 inches, landscape orientation)
-  pdf(pdf_file_path, width = 18, height = 10)
+  # Open a PDF device to save the plot
+  pdf(pdf_file_path, width = 25, height = 10)
   
-  # Set up the plotting area: 6 rows, 15 columns
-  par(mfrow = c(6, 15), mar = c(0.2, 0.5, 3, 0.2), oma = c(6, 6, 3, 0))  # Added extra space in oma for top text
+  # Set up the plotting area
+  par(mfrow = c(6, 21), mar = c(0.2, 0.5, 3, 0.2), oma = c(6, 6, 3, 0))  # Added extra space in oma for top text
   
-  # Loop through each year (2016 to 2021)
+  # Loop through each year
   for (year in 2016:2021) {
-    # Loop through each elevation band (1 to 15)
-    for (elevation in seq(100, 1500, by = 100)) {
+    # Loop through each elevation band
+    for (elevation in seq(100, 2100, by = 100)) {
       # Retrieve spline fits and anomaly data
       spline_fit_obs <- spline_fits_obs[[paste0("year", year, "_", elevation)]]
       spline_fit_model <- spline_fits_model[[paste0("year", year, "_", elevation)]]
@@ -1165,7 +1157,7 @@ for (obs_data_path in glacier_folders) {
       
       # Optionally, add year label on the left margin next to the first plot in each row
       if (elevation == 100) {
-        mtext(paste("----", year, "----", sep = ""), side = 2, line = 3, cex = 1.1)
+        mtext(paste("---", year, "---", sep = ""), side = 2, line = 3, cex = 1.1)
         mtext("scaled anomaly", side = 2, line = 2.1, cex = 0.7)
       }
       
@@ -1199,16 +1191,16 @@ for (obs_data_path in glacier_folders) {
   pdf_file_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Graphs/Obs-Mod-Res",
                              paste0("gl_", glacier_num, "_", flowline_num, "_omr_fric1.pdf"))
   
-  # Open a PDF device to save the plot (16x5 inches, landscape orientation)
-  pdf(pdf_file_path, width = 18, height = 10)
+  # Open a PDF device to save the plot
+  pdf(pdf_file_path, width = 25, height = 10)
   
-  # Set up the plotting area: 6 rows, 15 columns
-  par(mfrow = c(6, 15), mar = c(0.2, 0.5, 3, 0.2), oma = c(6, 6, 3, 0))  # Added extra space in oma for top text
+  # Set up the plotting area
+  par(mfrow = c(6, 21), mar = c(0.2, 0.5, 3, 0.2), oma = c(6, 6, 3, 0))  # Added extra space in oma for top text
   
-  # Loop through each year (2016 to 2021)
+  # Loop through each year
   for (year in 2016:2021) {
-    # Loop through each elevation band (1 to 15)
-    for (elevation in seq(100, 1500, by = 100)) {
+    # Loop through each elevation band
+    for (elevation in seq(100, 2100, by = 100)) {
       # Retrieve spline fits and anomaly data
       spline_fit_obs <- spline_fits_obs[[paste0("year", year, "_", elevation)]]
       spline_fit_model <- spline_fits_model[[paste0("year", year, "_", elevation)]]
@@ -1381,7 +1373,7 @@ for (obs_data_path in glacier_folders) {
       
       # Optionally, add year label on the left margin next to the first plot in each row
       if (elevation == 100) {
-        mtext(paste("----", year, "----", sep = ""), side = 2, line = 3, cex = 1.1)
+        mtext(paste("---", year, "---", sep = ""), side = 2, line = 3, cex = 1.1)
         mtext("scaled anomaly", side = 2, line = 2.1, cex = 0.7)
       }
       
@@ -1421,16 +1413,16 @@ for (obs_data_path in glacier_folders) {
   pdf_file_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Graphs/Obs-Mod-Res-Type",
                              paste0("gl_", glacier_num, "_", flowline_num, "_omrt_fric1.pdf"))
   
-  # Open a PDF device to save the plot (16x5 inches, landscape orientation)
-  pdf(pdf_file_path, width = 18, height = 10)
+  # Open a PDF device to save the plot
+  pdf(pdf_file_path, width = 25, height = 10)
   
-  # Set up the plotting area: 6 rows, 15 columns
-  par(mfrow = c(6, 15), mar = c(0.2, 0.5, 3, 0.2), oma = c(6, 6, 3, 0))  # Added extra space in oma for top text
+  # Set up the plotting area
+  par(mfrow = c(6, 21), mar = c(0.2, 0.5, 3, 0.2), oma = c(6, 6, 3, 0))  # Added extra space in oma for top text
   
-  # Loop through each year (2016 to 2021)
+  # Loop through each year
   for (year in 2016:2021) {
-    # Loop through each elevation band (1 to 15)
-    for (elevation in seq(100, 1500, by = 100)) {
+    # Loop through each elevation band
+    for (elevation in seq(100, 2100, by = 100)) {
       # Retrieve spline fits and anomaly data
       spline_fit_obs <- spline_fits_obs[[paste0("year", year, "_", elevation)]]
       spline_fit_model <- spline_fits_model[[paste0("year", year, "_", elevation)]]
@@ -1616,7 +1608,7 @@ for (obs_data_path in glacier_folders) {
       
       # Optionally, add elevation labels below the last row of plots
       if (elevation == 100) {
-        mtext(paste("----", year, "----", sep = ""), side = 2, line = 3, cex = 1.1)
+        mtext(paste("---", year, "---", sep = ""), side = 2, line = 3, cex = 1.1)
         mtext("scaled anomaly", side = 2, line = 2.1, cex = 0.7)
       }
       if (year == 2021) {
@@ -1644,8 +1636,8 @@ for (obs_data_path in glacier_folders) {
                              paste0("gl_", glacier_num, "_", flowline_num, "_hm_fric1.pdf"))
   
   # Open PDF device
-  pdf(pdf_file_path, width = 9, height = 4)  # Increased width for legend space
-  par(mar = c(0.2, 0.2, 0.2, 2), oma = c(4.5, 4, 1.5, 0.5))  # Adjusted margin for legend
+  pdf(pdf_file_path, width = 11.5, height = 4)  # Increased width for legend space
+  par(mar = c(0.2, 0.2, 0.2, 0.75), oma = c(4.5, 4, 1.5, 0.75))  # Adjusted margin for legend
   
   # Convert to log scale for better visualization, avoiding -Inf
   log_ratios <- log10(pmax(ratio_matrix, 10^-1))  # Clip small values at 10^-1
@@ -1659,7 +1651,7 @@ for (obs_data_path in glacier_folders) {
   log_ratios_reordered <- log_ratios[rev(seq_len(nrow(log_ratios))), ]  # Reverse row order
   
   # Set up plotting region with extra space for legend
-  layout(matrix(c(1,2), nrow = 1), widths = c(4, 0.5))  # Main plot (4), legend (0.5)
+  layout(matrix(c(1,2), nrow = 1), widths = c(5.8, 0.5))  # Main plot (4), legend (0.5)
   
   # Plot heatmap with corrected order
   image(1:length(elevations), 1:length(rev_years), t(log_ratios_reordered),
@@ -1681,7 +1673,7 @@ for (obs_data_path in glacier_folders) {
   mtext(paste0(folder_name, " - ", glacier_name), side = 3, line = 0, outer = TRUE, cex = 1.3)
   
   ### ADDING COLOR LEGEND ###
-  par(mar = c(0.2, 0, 0.2, 3))  # Adjust margin for legend panel
+  par(mar = c(0.2, 0, 0.2, 2.75))  # Adjust margin for legend panel
   image(1, seq(-1, 1, length.out = 1000), matrix(seq(-1, 1, length.out = 1000), nrow = 1),
         col = color_palette, breaks = breaks, axes = FALSE, xlab = "", ylab = "")
   
@@ -1692,7 +1684,7 @@ for (obs_data_path in glacier_folders) {
   # Add log-scale ticks and labels
   axis(4, at = log_ticks, labels = log_labels, las = 1, cex.axis = 0.8, line = 0.1)
   mtext("velocity driver", side = 4, line = 2.25, cex = 0.8)
-  mtext("friction                                            front", side = 4, line = -1.3, cex = 0.8)
+  mtext("basal                                       frontal", side = 4, line = -1.3, cex = 0.8)
   
   # Draw a black border around the legend
   rect(xleft = 0.6, xright = 1.4, ybottom = min(log_ticks), ytop = max(log_ticks),
@@ -1712,8 +1704,8 @@ for (obs_data_path in glacier_folders) {
                              paste0("gl_", glacier_num, "_", flowline_num, "_hmb_fric1.pdf"))
   
   # Open PDF device
-  pdf(pdf_file_path, width = 9, height = 4)  # Increased width for legend space
-  par(mar = c(0.2, 0.2, 0.2, 2), oma = c(4.5, 4, 1.5, 0.5))  # Adjusted margin for legend
+  pdf(pdf_file_path, width = 11.5, height = 4)  # Increased width for legend space
+  par(mar = c(0.2, 0.2, 0.2, 0.75), oma = c(4.5, 4, 1.5, 0.75))  # Adjusted margin for legend
   
   # Convert to log scale for better visualization, avoiding -Inf
   log_ratios <- log10(pmax(ratio_matrix, 10^-1))  # Clip small values at 10^-3
@@ -1727,7 +1719,7 @@ for (obs_data_path in glacier_folders) {
   log_ratios_reordered <- log_ratios[rev(seq_len(nrow(log_ratios))), ]  # Reverse row order
   
   # Set up plotting region with extra space for legend
-  layout(matrix(c(1,2), nrow = 1), widths = c(4, 0.5))  # Main plot (4), legend (0.5)
+  layout(matrix(c(1,2), nrow = 1), widths = c(5.8, 0.5))  # Main plot (4), legend (0.5)
   
   # Plot heatmap with corrected order
   image(1:length(elevations), 1:length(rev_years), t(log_ratios_reordered),
@@ -1749,7 +1741,7 @@ for (obs_data_path in glacier_folders) {
   mtext(paste0(folder_name, " - ", glacier_name), side = 3, line = 0, outer = TRUE, cex = 1.3)
   
   ### ADDING COLOR LEGEND ###
-  par(mar = c(0.2, 0, 0.2, 3))  # Adjust margin for legend panel
+  par(mar = c(0.2, 0, 0.2, 2.75))  # Adjust margin for legend panel
   image(1, seq(-1, 1, length.out = 2), matrix(seq(-1, 1, length.out = 2), nrow = 1),
         col = color_palette, breaks = breaks, axes = FALSE, xlab = "", ylab = "")
   
@@ -1758,8 +1750,8 @@ for (obs_data_path in glacier_folders) {
   log_labels <- parse(text = paste0("10^", log_ticks))  # Log-scale labels
   
   # Add log-scale ticks and labels
-  mtext("velocity driver", side = 4, line = 2.25, cex = 0.8)
-  mtext("friction                                            front", side = 4, line = -1.3, cex = 0.8, col = "white")
+  mtext("velocity driver", side = 4, line = 0, cex = 0.8)
+  mtext("basal                                       frontal", side = 4, line = -1.3, cex = 0.8, col = "white")
   
   # Draw a black border around the legend
   rect(xleft = 0.6, xright = 1.4, ybottom = -2, ytop = 2,

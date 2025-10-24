@@ -75,7 +75,7 @@
 ##### (Change the path to a desired glacier folder) ---
 
 # Parent directory containing all glacier folders
-obs_data_path <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Inputs/Observations/Glacier 44 Flowline 1"
+obs_data_path <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Inputs/Observations/Glacier 217 Flowline 5"
   setwd(obs_data_path)
   
   # Get the folder name (e.g., Glacier 1 Flowline 1)
@@ -221,7 +221,7 @@ obs_data_path <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Versi
         
         # Add year labels on the left of the first plot in each row (first elevation)
         if (elevation == 1) {
-          mtext(paste("----", year, "----", sep=""), side = 2, line = 3, cex = 1.1)
+          mtext(paste("---", year, "---", sep=""), side = 2, line = 3, cex = 1.1)
         }
         
         # Add elevation labels below the last row (for year 2021)
@@ -793,7 +793,7 @@ obs_data_path <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Versi
   
   # Define years and elevation bands
   years <- 2016:2021
-  elevations <- seq(100, 1500, by = 100)  # Assuming 15 elevation bands
+  elevations <- seq(100, 2100, by = 100)
   
   # Initialise matrix for storing ratios
   ratio_matrix <- matrix(NA, nrow = length(years), ncol = length(elevations),
@@ -895,7 +895,7 @@ obs_data_path <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Versi
   
   # Define years and elevation bands
   years <- 2016:2021
-  elevations <- seq(100, 1500, by = 100)
+  elevations <- seq(100, 2100, by = 100)
   
   # Initialise matrices for CADI
   cadi_matrix_obs <- matrix(NA, nrow = length(years), ncol = length(elevations),
@@ -984,14 +984,14 @@ obs_data_path <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Versi
   # Save CADI matrices for observed velocities as CSV
   types_obs_dir <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Types/Obs"
   if (!dir.exists(types_obs_dir)) dir.create(types_obs_dir, recursive = TRUE)
-  csv_obs_path <- file.path(types_obs_dir, paste0("gl_", glacier_num, "_", flowline_num, "_ot.csv"))
+  csv_obs_path <- file.path(types_obs_dir, paste0("gl_", glacier_num, "_", flowline_num, "_ot_fric1.csv"))
   write.csv(cadi_matrix_obs, csv_obs_path, row.names = TRUE)
   cat("Observed CADI indices saved at:", csv_obs_path, "\n")
   
   # Save CADI matrices for residual velocities as CSV
   types_res_dir <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Types/Res"
   if (!dir.exists(types_res_dir)) dir.create(types_res_dir, recursive = TRUE)
-  csv_res_path <- file.path(types_res_dir, paste0("gl_", glacier_num, "_", flowline_num, "_rt.csv"))
+  csv_res_path <- file.path(types_res_dir, paste0("gl_", glacier_num, "_", flowline_num, "_rt_fric1.csv"))
   write.csv(cadi_matrix_res, csv_res_path, row.names = TRUE)
   cat("Residual CADI indices saved at:", csv_res_path, "\n")
   
@@ -1002,16 +1002,16 @@ obs_data_path <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Versi
   pdf_file_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Graphs/Obs-Mod",
                              paste0("gl_", glacier_num, "_", flowline_num, "_om_fric1.pdf"))
   
-  # Open a PDF device to save the plot (16x5 inches, landscape orientation)
-  pdf(pdf_file_path, width = 18, height = 10)
+  # Open a PDF device to save the plot
+  pdf(pdf_file_path, width = 25, height = 10)
   
-  # Set up the plotting area: 6 rows, 15 columns
-  par(mfrow = c(6, 15), mar = c(0.2, 0.5, 3, 0.2), oma = c(6, 6, 3, 0))  # Added extra space in oma for top text
+  # Set up the plotting area
+  par(mfrow = c(6, 21), mar = c(0.2, 0.5, 3, 0.2), oma = c(6, 6, 3, 0))  # Added extra space in oma for top text
   
-  # Loop through each year (2016 to 2021)
+  # Loop through each year
   for (year in 2016:2021) {
-    # Loop through each elevation band (1 to 15)
-    for (elevation in seq(100, 1500, by = 100)) {
+    # Loop through each elevation band
+    for (elevation in seq(100, 2100, by = 100)) {
       # Retrieve spline fits and anomaly data
       spline_fit_obs <- spline_fits_obs[[paste0("year", year, "_", elevation)]]
       spline_fit_model <- spline_fits_model[[paste0("year", year, "_", elevation)]]
@@ -1148,7 +1148,7 @@ obs_data_path <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Versi
       
       # Optionally, add year label on the left margin next to the first plot in each row
       if (elevation == 100) {
-        mtext(paste("----", year, "----", sep = ""), side = 2, line = 3, cex = 1.1)
+        mtext(paste("---", year, "---", sep = ""), side = 2, line = 3, cex = 1.1)
         mtext("scaled anomaly", side = 2, line = 2.1, cex = 0.7)
       }
       
@@ -1182,16 +1182,16 @@ obs_data_path <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Versi
   pdf_file_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Graphs/Obs-Mod-Res",
                              paste0("gl_", glacier_num, "_", flowline_num, "_omr_fric1.pdf"))
   
-  # Open a PDF device to save the plot (16x5 inches, landscape orientation)
-  pdf(pdf_file_path, width = 18, height = 10)
+  # Open a PDF device to save the plot
+  pdf(pdf_file_path, width = 25, height = 10)
   
-  # Set up the plotting area: 6 rows, 15 columns
-  par(mfrow = c(6, 15), mar = c(0.2, 0.5, 3, 0.2), oma = c(6, 6, 3, 0))  # Added extra space in oma for top text
+  # Set up the plotting area
+  par(mfrow = c(6, 21), mar = c(0.2, 0.5, 3, 0.2), oma = c(6, 6, 3, 0))  # Added extra space in oma for top text
   
-  # Loop through each year (2016 to 2021)
+  # Loop through each year
   for (year in 2016:2021) {
-    # Loop through each elevation band (1 to 15)
-    for (elevation in seq(100, 1500, by = 100)) {
+    # Loop through each elevation band
+    for (elevation in seq(100, 2100, by = 100)) {
       # Retrieve spline fits and anomaly data
       spline_fit_obs <- spline_fits_obs[[paste0("year", year, "_", elevation)]]
       spline_fit_model <- spline_fits_model[[paste0("year", year, "_", elevation)]]
@@ -1364,7 +1364,7 @@ obs_data_path <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Versi
       
       # Optionally, add year label on the left margin next to the first plot in each row
       if (elevation == 100) {
-        mtext(paste("----", year, "----", sep = ""), side = 2, line = 3, cex = 1.1)
+        mtext(paste("---", year, "---", sep = ""), side = 2, line = 3, cex = 1.1)
         mtext("scaled anomaly", side = 2, line = 2.1, cex = 0.7)
       }
       
@@ -1393,27 +1393,27 @@ obs_data_path <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Versi
   
   # Load pre-saved CADI matrices (years as rows, elevations as columns)
   types_obs_dir <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Types/Obs"
-  csv_obs_path  <- file.path(types_obs_dir, paste0("gl_", glacier_num, "_", flowline_num, "_ot.csv"))
+  csv_obs_path  <- file.path(types_obs_dir, paste0("gl_", glacier_num, "_", flowline_num, "_ot_fric1.csv"))
   cadi_matrix_obs <- as.matrix(read.csv(csv_obs_path, row.names = 1, check.names = FALSE))
   
   types_res_dir <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Types/Res"
-  csv_res_path  <- file.path(types_res_dir, paste0("gl_", glacier_num, "_", flowline_num, "_rt.csv"))
+  csv_res_path  <- file.path(types_res_dir, paste0("gl_", glacier_num, "_", flowline_num, "_rt_fric1.csv"))
   cadi_matrix_res <- as.matrix(read.csv(csv_res_path, row.names = 1, check.names = FALSE))
   
   # Define the path to save the PDF
   pdf_file_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Graphs/Obs-Mod-Res-Type",
                              paste0("gl_", glacier_num, "_", flowline_num, "_omrt_fric1.pdf"))
   
-  # Open a PDF device to save the plot (16x5 inches, landscape orientation)
-  pdf(pdf_file_path, width = 18, height = 10)
+  # Open a PDF device to save the plot
+  pdf(pdf_file_path, width = 25, height = 10)
   
-  # Set up the plotting area: 6 rows, 15 columns
-  par(mfrow = c(6, 15), mar = c(0.2, 0.5, 3, 0.2), oma = c(6, 6, 3, 0))  # Added extra space in oma for top text
+  # Set up the plotting area
+  par(mfrow = c(6, 21), mar = c(0.2, 0.5, 3, 0.2), oma = c(6, 6, 3, 0))  # Added extra space in oma for top text
   
-  # Loop through each year (2016 to 2021)
+  # Loop through each year
   for (year in 2016:2021) {
-    # Loop through each elevation band (1 to 15)
-    for (elevation in seq(100, 1500, by = 100)) {
+    # Loop through each elevation band
+    for (elevation in seq(100, 2100, by = 100)) {
       # Retrieve spline fits and anomaly data
       spline_fit_obs <- spline_fits_obs[[paste0("year", year, "_", elevation)]]
       spline_fit_model <- spline_fits_model[[paste0("year", year, "_", elevation)]]
@@ -1599,7 +1599,7 @@ obs_data_path <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Versi
       
       # Optionally, add elevation labels below the last row of plots
       if (elevation == 100) {
-        mtext(paste("----", year, "----", sep = ""), side = 2, line = 3, cex = 1.1)
+        mtext(paste("---", year, "---", sep = ""), side = 2, line = 3, cex = 1.1)
         mtext("scaled anomaly", side = 2, line = 2.1, cex = 0.7)
       }
       if (year == 2021) {
@@ -1627,8 +1627,8 @@ obs_data_path <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Versi
                              paste0("gl_", glacier_num, "_", flowline_num, "_hm_fric1.pdf"))
   
   # Open PDF device
-  pdf(pdf_file_path, width = 9, height = 4)  # Increased width for legend space
-  par(mar = c(0.2, 0.2, 0.2, 2), oma = c(4.5, 4, 1.5, 0.5))  # Adjusted margin for legend
+  pdf(pdf_file_path, width = 11.5, height = 4)  # Increased width for legend space
+  par(mar = c(0.2, 0.2, 0.2, 0.75), oma = c(4.5, 4, 1.5, 0.75))  # Adjusted margin for legend
   
   # Convert to log scale for better visualization, avoiding -Inf
   log_ratios <- log10(pmax(ratio_matrix, 10^-1))  # Clip small values at 10^-1
@@ -1642,7 +1642,7 @@ obs_data_path <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Versi
   log_ratios_reordered <- log_ratios[rev(seq_len(nrow(log_ratios))), ]  # Reverse row order
   
   # Set up plotting region with extra space for legend
-  layout(matrix(c(1,2), nrow = 1), widths = c(4, 0.5))  # Main plot (4), legend (0.5)
+  layout(matrix(c(1,2), nrow = 1), widths = c(5.8, 0.5))  # Main plot (4), legend (0.5)
   
   # Plot heatmap with corrected order
   image(1:length(elevations), 1:length(rev_years), t(log_ratios_reordered),
@@ -1664,7 +1664,7 @@ obs_data_path <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Versi
   mtext(paste0(folder_name, " - ", glacier_name), side = 3, line = 0, outer = TRUE, cex = 1.3)
   
   ### ADDING COLOR LEGEND ###
-  par(mar = c(0.2, 0, 0.2, 3))  # Adjust margin for legend panel
+  par(mar = c(0.2, 0, 0.2, 2.75))  # Adjust margin for legend panel
   image(1, seq(-1, 1, length.out = 1000), matrix(seq(-1, 1, length.out = 1000), nrow = 1),
         col = color_palette, breaks = breaks, axes = FALSE, xlab = "", ylab = "")
   
@@ -1675,7 +1675,7 @@ obs_data_path <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Versi
   # Add log-scale ticks and labels
   axis(4, at = log_ticks, labels = log_labels, las = 1, cex.axis = 0.8, line = 0.1)
   mtext("velocity driver", side = 4, line = 2.25, cex = 0.8)
-  mtext("friction                                            front", side = 4, line = -1.3, cex = 0.8)
+  mtext("basal                                       frontal", side = 4, line = -1.3, cex = 0.8)
   
   # Draw a black border around the legend
   rect(xleft = 0.6, xright = 1.4, ybottom = min(log_ticks), ytop = max(log_ticks),
@@ -1695,8 +1695,8 @@ obs_data_path <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Versi
                              paste0("gl_", glacier_num, "_", flowline_num, "_hmb_fric1.pdf"))
   
   # Open PDF device
-  pdf(pdf_file_path, width = 9, height = 4)  # Increased width for legend space
-  par(mar = c(0.2, 0.2, 0.2, 2), oma = c(4.5, 4, 1.5, 0.5))  # Adjusted margin for legend
+  pdf(pdf_file_path, width = 11.5, height = 4)  # Increased width for legend space
+  par(mar = c(0.2, 0.2, 0.2, 0.75), oma = c(4.5, 4, 1.5, 0.75))  # Adjusted margin for legend
   
   # Convert to log scale for better visualization, avoiding -Inf
   log_ratios <- log10(pmax(ratio_matrix, 10^-1))  # Clip small values at 10^-3
@@ -1710,7 +1710,7 @@ obs_data_path <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Versi
   log_ratios_reordered <- log_ratios[rev(seq_len(nrow(log_ratios))), ]  # Reverse row order
   
   # Set up plotting region with extra space for legend
-  layout(matrix(c(1,2), nrow = 1), widths = c(4, 0.5))  # Main plot (4), legend (0.5)
+  layout(matrix(c(1,2), nrow = 1), widths = c(5.8, 0.5))  # Main plot (4), legend (0.5)
   
   # Plot heatmap with corrected order
   image(1:length(elevations), 1:length(rev_years), t(log_ratios_reordered),
@@ -1732,7 +1732,7 @@ obs_data_path <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Versi
   mtext(paste0(folder_name, " - ", glacier_name), side = 3, line = 0, outer = TRUE, cex = 1.3)
   
   ### ADDING COLOR LEGEND ###
-  par(mar = c(0.2, 0, 0.2, 3))  # Adjust margin for legend panel
+  par(mar = c(0.2, 0, 0.2, 2.75))  # Adjust margin for legend panel
   image(1, seq(-1, 1, length.out = 2), matrix(seq(-1, 1, length.out = 2), nrow = 1),
         col = color_palette, breaks = breaks, axes = FALSE, xlab = "", ylab = "")
   
@@ -1741,8 +1741,8 @@ obs_data_path <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Versi
   log_labels <- parse(text = paste0("10^", log_ticks))  # Log-scale labels
   
   # Add log-scale ticks and labels
-  mtext("velocity driver", side = 4, line = 2.25, cex = 0.8)
-  mtext("friction                                            front", side = 4, line = -1.3, cex = 0.8, col = "white")
+  mtext("velocity driver", side = 4, line = 0, cex = 0.8)
+  mtext("basal                                       frontal", side = 4, line = -1.3, cex = 0.8, col = "white")
   
   # Draw a black border around the legend
   rect(xleft = 0.6, xright = 1.4, ybottom = -2, ytop = 2,
