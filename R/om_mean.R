@@ -11,19 +11,15 @@ parent_directory <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Ve
 output_base_dir <- file.path(parent_directory, "Outputs", "fric_comp", "Multiyear Mean")
 if (!dir.exists(output_base_dir)) dir.create(output_base_dir, recursive = TRUE, showWarnings = FALSE)
 
-# Path to the glacier name mapping CSV
-glacier_info_path <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/New Points v3/Input/Box Coordinates/box_sp_all_v3.csv"
+# Path to the glacier mapping CSV (no coord_* columns; has pathline_ID_* columns)
+glacier_info_path <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/New Points v3/Flowlines of Interest/fl_picks_3.1.csv"
 glacier_info <- read.csv(glacier_info_path, check.names = FALSE, stringsAsFactors = FALSE)
 
-# Expect EXACT column names in box_sp_all_v3.csv
-# Required: feature_ID, glacier_ID, glacier_name, and coord_*_* columns
+# Required columns check
 required_cols <- c("feature_ID","glacier_ID","glacier_name")
 if (!all(required_cols %in% names(glacier_info))) {
-  stop("box_sp_all_v3.csv must contain columns: feature_ID, glacier_ID, glacier_name, and coord_*_*.")
+  stop("fl_picks_3.1.csv must contain columns: feature_ID, glacier_ID, glacier_name, plus pathline_ID_* columns.")
 }
-
-# Collect ALL coord_*_* columns once so rbind() works across mixed flowlines
-all_coord_cols <- grep("^coord_\\d+_\\d+$", names(glacier_info), value = TRUE)
 
 # Years to average (inclusive)
 years_to_average <- 2016:2021
@@ -38,6 +34,9 @@ if (length(fric_ratio_dirs) == 0) stop("No 'fric*/Ratios' directories found unde
 # Colors and legend setup (keep style)
 breaks <- seq(-1, 1, length.out = 1000)  # Log scale
 color_palette <- colorRampPalette(c("#364B9A", "#EAECCC", "#A50026"))(999)
+
+# Collect per-fric plots for a combined 3-panel figure
+fric_plots <- list()
 
 # Loop over each friction law directory
 for (fric_path in fric_ratio_dirs) {
@@ -58,8 +57,9 @@ for (fric_path in fric_ratio_dirs) {
   }
   
   heatmap_data <- list()  # each row = one flowline
-  meta_rows    <- list()  # per-row metadata + ratios
+  meta_rows    <- list()  # per-row metadata (no ratios here)
   
+  # ---- inner loop: per file ----
   for (file_path in ratio_files) {
     bname <- basename(file_path)
     
@@ -70,6 +70,11 @@ for (fric_path in fric_ratio_dirs) {
     feature_id  <- as.integer(mm[2])
     flowline_id <- as.integer(mm[3])
     # fric_num already known
+    
+    # === EXCLUDE selected features ===
+    if (feature_id %in% c(103L, 104L)) {
+      next
+    }
     
     # Read ratios
     ratio_data <- read.csv(file_path, row.names = 1, check.names = FALSE)
@@ -95,44 +100,32 @@ for (fric_path in fric_ratio_dirs) {
     
     # Match metadata by feature_ID (one row per feature)
     gi_row <- glacier_info[glacier_info$feature_ID == feature_id, , drop = FALSE]
-    if (nrow(gi_row) != 1) { cat("feature_ID", feature_id, "not uniquely found in box_sp_all_v3.csv. Skipping", bname, "\n"); next }
+    if (nrow(gi_row) != 1) { cat("feature_ID", feature_id, "not uniquely found in fl_picks_3.1.csv. Skipping", bname, "\n"); next }
     
     glacier_ID   <- gi_row$glacier_ID[1]
     glacier_name <- gi_row$glacier_name[1]
     
-    # ----- coords for THIS flowline (SECOND number = flowline_ID) -----
-    # Columns like coord_1_3, coord_2_3 ... -> pick those with _{flowline_ID} at the end
-    coord_cols_this <- grep(paste0("^coord_\\d+_", flowline_id, "$"), names(gi_row), value = TRUE)
-    if (length(coord_cols_this) == 0) {
-      cat("No coord columns found for flowline_ID:", flowline_id, "in file:", bname, "\n")
-      next
-    }
-    
-    # Build a 1-row data.frame with ALL coord_*_* columns (NA by default) so rbind names align
-    coords_df <- as.data.frame(matrix(NA_real_, nrow = 1, ncol = length(all_coord_cols)))
-    names(coords_df) <- all_coord_cols
-    # Fill only the columns for THIS flowline_ID
-    coords_df[coord_cols_this] <- gi_row[coord_cols_this]
+    # Pull pathline_ID value from the column pathline_ID_{flowline_ID}; if missing, set NA
+    pathline_col <- paste0("pathline_ID_", flowline_id)
+    pathline_val <- if (pathline_col %in% names(gi_row)) gi_row[[pathline_col]][1] else NA
     
     # Unique key to keep stable ordering later
     storage_key <- sprintf("gID%08d_f%06d_fl%04d", as.integer(glacier_ID), as.integer(feature_id), as.integer(flowline_id))
     
-    # Store for heatmap
+    # Store for heatmap (ratios)
     heatmap_data[[storage_key]] <- mean_ratios
     
-    # Assemble row for CSV (metadata + ratios)
-    meta_piece <- data.frame(
+    # Store metadata only (no ratios here)
+    meta_rows[[storage_key]] <- data.frame(
       glacier_ID   = glacier_ID,
       glacier_name = glacier_name,
       feature_ID   = feature_id,
       flowline_ID  = flowline_id,
+      pathline_ID  = pathline_val,
       check.names  = FALSE,
       stringsAsFactors = FALSE
     )
-    row_df <- cbind(meta_piece, coords_df, as.data.frame(as.list(mean_ratios), check.names = FALSE))
-    row_df$..storage_key <- storage_key
-    meta_rows[[storage_key]] <- row_df
-  }
+  }  # <-- end inner for (file_path)
   
   if (length(heatmap_data) == 0) {
     cat("No valid glacier/flowline data found for", fric_name, ".\n")
@@ -146,7 +139,10 @@ for (fric_path in fric_ratio_dirs) {
   eb_ordered <- all_bands[band_order]
   
   # Build matrix in consistent column order
-  heatmap_matrix <- do.call(rbind, lapply(heatmap_data, function(v) v[match(eb_ordered, names(v))]))
+  heatmap_matrix <- do.call(
+    rbind,
+    lapply(heatmap_data, function(v) v[match(eb_ordered, names(v))])
+  )
   colnames(heatmap_matrix) <- eb_ordered
   rownames(heatmap_matrix) <- names(heatmap_data)
   
@@ -176,13 +172,20 @@ for (fric_path in fric_ratio_dirs) {
   pdf_file_path   <- file.path(output_base_dir, sprintf("mean_hm_fric%s.pdf", fric_num))
   csv_output_path <- file.path(output_base_dir, sprintf("mean_ratio_fric%s.csv", fric_num))
   
+  # Save data for combined multi-fric figure
+  fric_plots[[fric_num]] <- list(
+    z    = log_ratios_plot,
+    rows = row_labels_plot,
+    cols = colnames(log_ratios_plot)
+  )
+  
   ##### PLOTTING THE MULTI-GLACIER HEATMAP #####
   # Open PDF device
-  pdf(pdf_file_path, width = 8, height = max(4, nrow(log_ratios_plot) * 0.3))  # Adjust height dynamically
+  pdf(pdf_file_path, width = 16, height = max(4, nrow(log_ratios_plot) * 0.3))  # Adjust height dynamically
   
   # Set up plotting layout (left: heatmaps, right: legend)
-  layout(matrix(c(1,2), nrow = 1), widths = c(4, 0.5)) 
-  par(mar = c(1.75, 0.2, 0.5, 0.5), oma = c(3, 4, 0.5, 0.75))
+  layout(matrix(c(1,2), nrow = 1), widths = c(4, 0.25)) 
+  par(mar = c(1.75, 0.5, 0.5, 0.5), oma = c(3, 13, 0.5, 0.75))
   
   # Plot heatmap for all glaciers/flowlines
   image(
@@ -206,19 +209,18 @@ for (fric_path in fric_ratio_dirs) {
   axis(1,
        at = 1:length(colnames(log_ratios_plot)),
        labels = paste0(as.numeric(colnames(log_ratios_plot)), "m"),
-       las = 2, tck = -0.02, lwd = 0, lwd.ticks = 1, cex.axis = 1)
+       las = 2, tck = -0.01, lwd = 0, lwd.ticks = 1, cex.axis = 1)
   
   axis(2,
        at = 1:length(row_labels_plot),
        labels = row_labels_plot,
-       las = 1, tck = -0.02, lwd = 0, lwd.ticks = 1, cex.axis = 1)
+       las = 1, tck = -0.01, lwd = 0, lwd.ticks = 1, cex.axis = 1)
   
   # Global labels
-  mtext("glacier", side = 2, line = 3, outer = TRUE, cex = 1.1)
   mtext("elevation band", side = 1, line = 1.7, outer = TRUE, cex = 1.1)
   
   ### ADDING COLOR LEGEND ###
-  par(mar = c(16, 0, 16, 2.5))  # Adjust margin for legend panel
+  par(mar = c(90, 0, 90, 2.5))  # Adjust margin for legend panel
   image(1, seq(-1, 1, length.out = 1000), matrix(seq(-1, 1, length.out = 1000), nrow = 1),
         col = color_palette, breaks = breaks, axes = FALSE, xlab = "", ylab = "")
   
@@ -239,10 +241,8 @@ for (fric_path in fric_ratio_dirs) {
   dev.off()
   
   # ---- Save multiyear means with metadata ----
-  # Keep metadata first (glacier_ID, glacier_name, feature_ID, flowline_ID, then ALL coord_*_*),
-  # followed by elevation bands (already aligned in heatmap_matrix)
   out_df <- cbind(
-    meta_df[, c("glacier_ID","glacier_name","feature_ID","flowline_ID"), drop = FALSE],
+    meta_df[, c("glacier_ID","glacier_name","feature_ID","flowline_ID","pathline_ID"), drop = FALSE],
     as.data.frame(heatmap_matrix, check.names = FALSE)
   )
   
@@ -251,5 +251,66 @@ for (fric_path in fric_ratio_dirs) {
   
   cat("Heatmap saved at:", pdf_file_path, "\n")
   cat("Mean ratios (with metadata) saved at:", csv_output_path, "\n\n")
-}
+  
+}  # <-- end outer for (fric_path)
 
+# ===== Combined 3-panel figure (consistent + bigger labels + custom titles/order) =====
+if (length(fric_plots) >= 2) {
+  # Desired order: fric1, fric3, fric2
+  frics_available <- sort(as.integer(names(fric_plots)))
+  frics_to_plot <- intersect(c(1, 3, 2), frics_available)
+  
+  # Titles per fric
+  fric_titles <- c("1" = "Budd m=1", "2" = "Schoof m=3", "3" = "Budd m=6")
+  
+  common_rows <- Reduce(intersect, lapply(frics_to_plot, function(f) fric_plots[[as.character(f)]]$rows))
+  common_cols <- Reduce(intersect, lapply(frics_to_plot, function(f) fric_plots[[as.character(f)]]$cols))
+  
+  if (length(common_rows) > 0 && length(common_cols) > 0) {
+    pdf(file.path(output_base_dir, "mean_hm_fric_all.pdf"),
+        width = 48, height = max(4, length(common_rows) * 0.3), onefile = TRUE)
+    
+    layout(matrix(c(1,2,3,4), nrow = 1), widths = c(4, 4, 4, 0.25))
+    par(oma = c(10, 30, 4, 8))  # keep consistent with single plot
+    
+    for (idx in seq_along(frics_to_plot)) {
+      f   <- frics_to_plot[idx]; key <- as.character(f)
+      z   <- fric_plots[[key]]$z
+      r   <- fric_plots[[key]]$rows
+      cns <- colnames(z)
+      
+      # subset to common rows/cols in the same order
+      z <- z[match(common_rows, r), match(common_cols, cns), drop = FALSE]
+      
+      par(mar = c(1.75, 0.5, 0.5, 0.5))
+      image(1:length(common_cols), 1:length(common_rows), t(z),
+            col = color_palette, breaks = breaks, axes = FALSE, xlab = "", ylab = "")
+      for (i in 1:length(common_rows)) {
+        rect(0.5, i - 0.5, length(common_cols) + 0.5, i + 0.5, border = "black", lwd = 2)
+      }
+      axis(1, at = 1:length(common_cols), labels = paste0(as.numeric(common_cols), "m"),
+           las = 2, tck = -0.005, lwd = 0, lwd.ticks = 1, cex.axis = 2.5)
+      if (idx == 1) {
+        axis(2, at = 1:length(common_rows), labels = common_rows,
+             las = 1, tck = -0.005, lwd = 0, lwd.ticks = 1, cex.axis = 2.5)
+      }
+      if (idx == 2) {
+        mtext("elevation band", side = 1, line = 8, outer = TRUE, cex = 2.5)
+      }
+      mtext(fric_titles[key], side = 3, line = 1, cex = 2.5)
+    }
+    
+    # Legend panel (same style as single, larger tick labels)
+    par(mar = c(105, 0, 105, 1.5))
+    image(1, seq(-1, 1, length.out = 1000), matrix(seq(-1, 1, length.out = 1000), nrow = 1),
+          col = color_palette, breaks = breaks, axes = FALSE, xlab = "", ylab = "")
+    log_ticks  <- seq(-1, 1, by = 1)
+    log_labels <- parse(text = paste0("10^", log_ticks))
+    axis(4, at = log_ticks, labels = log_labels, las = 1, cex.axis = 3.5, line = 0.1)
+    mtext("velocity driver", side = 4, line = 8, cex = 2.5)
+    mtext("friction                                     front", side = 4, line = -2, cex = 2.5)
+    rect(0.6, min(log_ticks), 1.4, max(log_ticks), border = "black", lwd = 2)
+    
+    dev.off()
+  }
+}
