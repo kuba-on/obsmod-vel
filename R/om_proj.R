@@ -75,7 +75,7 @@
 ##### (Change the path to a desired glacier folder) ---
 
 # Parent directory containing all glacier folders
-obs_data_path <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Inputs/Observations/Glacier 217 Flowline 5"
+obs_data_path <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Inputs/Observations/Glacier 32 Flowline 1"
   setwd(obs_data_path)
   
   # Get the folder name (e.g., Glacier 1 Flowline 1)
@@ -1757,3 +1757,995 @@ obs_data_path <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Versi
   cat("Processed glacier folder:", folder_name, "\n")
 
   
+  ##### 8f. MEAN MATRICES (ANNUAL & SUMMER; OBS/MODEL/RES + NORM FACTOR) #####
+  
+  years <- 2016:2021
+  elevations <- seq(100, 2100, by = 100)
+  
+  .new_mat <- function() {
+    matrix(NA_real_,
+           nrow = length(years),
+           ncol = length(elevations),
+           dimnames = list(as.character(years), as.character(elevations)))
+  }
+  .safe_wmean <- function(x, w) {
+    if (is.null(x) || is.null(w)) return(NA_real_)
+    mask <- is.finite(x) & is.finite(w)
+    if (!any(mask)) return(NA_real_)
+    weighted.mean(x[mask], w[mask], na.rm = TRUE)
+  }
+  .safe_mean <- function(x) {
+    if (is.null(x)) return(NA_real_)
+    val <- mean(x, na.rm = TRUE)
+    if (is.finite(val)) val else NA_real_
+  }
+  .is_summer <- function(d, yr) {
+    if (is.null(d)) return(rep(FALSE, 0))
+    d >= as.Date(paste0(yr, "-05-01")) & d <= as.Date(paste0(yr, "-09-30"))
+  }
+  
+  # ---- Allocate matrices ----
+  # Annual — OBS (weighted)
+  mean_a_obs_vel_mat        <- .new_mat() # 1a
+  mean_a_obs_vel_err_mat    <- .new_mat() # 1b
+  mean_a_obs_norm_vel_mat   <- .new_mat() # 1c
+  
+  # Annual — MODEL (simple means)
+  mean_a_model_vel_mat      <- .new_mat() # 2a
+  mean_a_model_norm_vel_mat <- .new_mat() # 2b
+  
+  # Annual — RES (weighted)
+  mean_a_res_vel_mat        <- .new_mat() # 3a
+  mean_a_res_anom_mat       <- .new_mat() # 3b (computed; not saved per spec)
+  mean_a_res_norm_anom_mat  <- .new_mat() # 3c (computed; not saved per spec)
+  
+  # Annual — Normalisation factor (max abs of obs+model anomalies)
+  mean_a_norm_factor_mat    <- .new_mat() # 4a
+  
+  # Summer — OBS (weighted)
+  mean_s_obs_vel_mat        <- .new_mat() # 1a
+  mean_s_obs_vel_err_mat    <- .new_mat() # 1b
+  mean_s_obs_norm_vel_mat   <- .new_mat() # 1c
+  mean_s_obs_anom_mat       <- .new_mat() # 1d
+  mean_s_obs_norm_anom_mat  <- .new_mat() # 1e
+  
+  # Summer — MODEL (simple means)
+  mean_s_model_vel_mat        <- .new_mat() # 2a
+  mean_s_model_norm_vel_mat   <- .new_mat() # 2b
+  mean_s_model_anom_mat       <- .new_mat() # 2c
+  mean_s_model_norm_anom_mat  <- .new_mat() # 2d
+  
+  # Summer — RES (weighted)
+  mean_s_res_vel_mat         <- .new_mat() # 3a
+  mean_s_res_anom_mat        <- .new_mat() # 3b
+  mean_s_res_norm_anom_mat   <- .new_mat() # 3c
+  
+  # Summer — Normalisation factor (max abs of obs+model anomalies)
+  mean_s_norm_factor_mat     <- .new_mat() # 4a
+  
+  # ---- Compute matrices ----
+  for (yr in years) {
+    for (elev in elevations) {
+      key <- paste0("year", yr, "_", elev)
+      
+      obs    <- if (exists("data_with_anomalies_obs"))    data_with_anomalies_obs[[key]]    else NULL
+      model  <- if (exists("data_with_anomalies_model"))  data_with_anomalies_model[[key]]  else NULL
+      resdat <- if (exists("residuals_data"))             residuals_data[[key]]             else NULL
+      
+      # ----- Annual -----
+      if (!is.null(obs) && nrow(obs) > 0) {
+        mean_a_obs_vel_mat[as.character(yr), as.character(elev)]      <- .safe_wmean(obs$vel,       obs$weight)
+        mean_a_obs_vel_err_mat[as.character(yr), as.character(elev)]  <- .safe_wmean(obs$vel_error, obs$weight)
+        mean_a_obs_norm_vel_mat[as.character(yr), as.character(elev)] <- .safe_wmean(obs$norm_vel,  obs$weight)
+      }
+      if (!is.null(model) && nrow(model) > 0) {
+        mean_a_model_vel_mat[as.character(yr), as.character(elev)]      <- .safe_mean(model$vel)
+        mean_a_model_norm_vel_mat[as.character(yr), as.character(elev)] <- .safe_mean(model$norm_vel)
+      }
+      if (!is.null(resdat) && nrow(resdat) > 0) {
+        mean_a_res_vel_mat[as.character(yr), as.character(elev)]       <- .safe_wmean(resdat$residual,               resdat$weight)
+        mean_a_res_anom_mat[as.character(yr), as.character(elev)]      <- .safe_wmean(resdat$residual_anomaly,       resdat$weight)
+        mean_a_res_norm_anom_mat[as.character(yr), as.character(elev)] <- .safe_wmean(resdat$residual_norm_anomaly,  resdat$weight)
+      }
+      if ((!is.null(obs) && nrow(obs) > 0) || (!is.null(model) && nrow(model) > 0)) {
+        nf_a <- suppressWarnings(max(abs(c(if (!is.null(obs)) obs$anomaly else NULL,
+                                           if (!is.null(model)) model$anomaly else NULL)), na.rm = TRUE))
+        if (is.finite(nf_a)) mean_a_norm_factor_mat[as.character(yr), as.character(elev)] <- nf_a
+      }
+      
+      # ----- Summer (May 1 – Sep 30) -----
+      if (!is.null(obs) && nrow(obs) > 0) {
+        sm <- .is_summer(obs$date, yr)
+        if (any(sm, na.rm = TRUE)) {
+          mean_s_obs_vel_mat[as.character(yr), as.character(elev)]        <- .safe_wmean(obs$vel[sm],           obs$weight[sm])
+          mean_s_obs_vel_err_mat[as.character(yr), as.character(elev)]    <- .safe_wmean(obs$vel_error[sm],     obs$weight[sm])
+          mean_s_obs_norm_vel_mat[as.character(yr), as.character(elev)]   <- .safe_wmean(obs$norm_vel[sm],      obs$weight[sm])
+          mean_s_obs_anom_mat[as.character(yr), as.character(elev)]       <- .safe_wmean(obs$anomaly[sm],       obs$weight[sm])
+          mean_s_obs_norm_anom_mat[as.character(yr), as.character(elev)]  <- .safe_wmean(obs$norm_anomaly[sm],  obs$weight[sm])
+        }
+      }
+      if (!is.null(model) && nrow(model) > 0) {
+        smm <- .is_summer(model$date, yr)
+        if (any(smm, na.rm = TRUE)) {
+          mean_s_model_vel_mat[as.character(yr), as.character(elev)]        <- .safe_mean(model$vel[smm])
+          mean_s_model_norm_vel_mat[as.character(yr), as.character(elev)]   <- .safe_mean(model$norm_vel[smm])
+          mean_s_model_anom_mat[as.character(yr), as.character(elev)]       <- .safe_mean(model$anomaly[smm])
+          mean_s_model_norm_anom_mat[as.character(yr), as.character(elev)]  <- .safe_mean(model$norm_anomaly[smm])
+        }
+      }
+      if (!is.null(resdat) && nrow(resdat) > 0) {
+        smr <- .is_summer(resdat$date, yr)
+        if (any(smr, na.rm = TRUE)) {
+          mean_s_res_vel_mat[as.character(yr), as.character(elev)]        <- .safe_wmean(resdat$residual[smr],              resdat$weight[smr])
+          mean_s_res_anom_mat[as.character(yr), as.character(elev)]       <- .safe_wmean(resdat$residual_anomaly[smr],      resdat$weight[smr])
+          mean_s_res_norm_anom_mat[as.character(yr), as.character(elev)]  <- .safe_wmean(resdat$residual_norm_anomaly[smr], resdat$weight[smr])
+        }
+      }
+      if ((!is.null(obs) && nrow(obs) > 0) || (!is.null(model) && nrow(model) > 0)) {
+        # summer norm factor
+        obs_a   <- if (!is.null(obs))   obs$anomaly   else NULL
+        model_a <- if (!is.null(model)) model$anomaly else NULL
+        sm_obs   <- if (!is.null(obs))   .is_summer(obs$date, yr)   else NULL
+        sm_model <- if (!is.null(model)) .is_summer(model$date, yr) else NULL
+        nf_s <- suppressWarnings(max(abs(c(if (!is.null(obs_a))   obs_a[sm_obs]   else NULL,
+                                           if (!is.null(model_a)) model_a[sm_model] else NULL)), na.rm = TRUE))
+        if (is.finite(nf_s)) mean_s_norm_factor_mat[as.character(yr), as.character(elev)] <- nf_s
+      }
+    }
+  }
+  
+  # ---- Save CSVs to requested folder structure ----
+  base_dir <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Mean Velocities"
+  mk <- function(path) if (!dir.exists(path)) dir.create(path, recursive = TRUE)
+  
+  # Annual paths
+  p_a_obs_v    <- file.path(base_dir, "Annual/Obs/Mean V");                 mk(p_a_obs_v)
+  p_a_obs_ve   <- file.path(base_dir, "Annual/Obs/Mean V Error");           mk(p_a_obs_ve)
+  p_a_obs_vn   <- file.path(base_dir, "Annual/Obs/Mean V Norm");            mk(p_a_obs_vn)
+  p_a_model_v  <- file.path(base_dir, "Annual/Model/Mean V");               mk(p_a_model_v)
+  p_a_model_vn <- file.path(base_dir, "Annual/Model/Mean V Norm");          mk(p_a_model_vn)
+  p_a_res_v    <- file.path(base_dir, "Annual/Res/Mean V");                 mk(p_a_res_v)
+  p_a_norm     <- file.path(base_dir, "Annual/Norm/Normalisation Factor");  mk(p_a_norm)
+  
+  # Summer paths
+  p_s_obs_v    <- file.path(base_dir, "Summer/Obs/Mean V");                         mk(p_s_obs_v)
+  p_s_obs_ve   <- file.path(base_dir, "Summer/Obs/Mean V Error");                   mk(p_s_obs_ve)
+  p_s_obs_vn   <- file.path(base_dir, "Summer/Obs/Mean V Norm");                    mk(p_s_obs_vn)
+  p_s_obs_a    <- file.path(base_dir, "Summer/Obs/Mean Anomaly");                   mk(p_s_obs_a)
+  p_s_obs_an   <- file.path(base_dir, "Summer/Obs/Mean Anomaly Norm Norm");         mk(p_s_obs_an)
+  p_s_model_v  <- file.path(base_dir, "Summer/Model/Mean V");                       mk(p_s_model_v)
+  p_s_model_vn <- file.path(base_dir, "Summer/Model/Mean V Norm");                  mk(p_s_model_vn)
+  p_s_model_a  <- file.path(base_dir, "Summer/Model/Mean Anomaly");                 mk(p_s_model_a)
+  p_s_model_an <- file.path(base_dir, "Summer/Model/Mean Anomaly Norm Norm");       mk(p_s_model_an)
+  p_s_res_v    <- file.path(base_dir, "Summer/Res/Mean V");                         mk(p_s_res_v)
+  p_s_res_a    <- file.path(base_dir, "Summer/Res/Mean Anomaly");                   mk(p_s_res_a)
+  p_s_res_an   <- file.path(base_dir, "Summer/Res/Mean Anomaly Norm");              mk(p_s_res_an)
+  p_s_norm     <- file.path(base_dir, "Summer/Res/Norm/Normalisation Factor");      mk(p_s_norm) # per spec
+  
+  # Annual files
+  write.csv(mean_a_obs_vel_mat,        file.path(p_a_obs_v,    paste0("gl_", glacier_num, "_", flowline_num, "_mean_a_obs_vel_fric1.csv")),        row.names = TRUE)
+  write.csv(mean_a_obs_vel_err_mat,    file.path(p_a_obs_ve,   paste0("gl_", glacier_num, "_", flowline_num, "_mean_a_obs_vel-error_fric1.csv")),  row.names = TRUE)
+  write.csv(mean_a_obs_norm_vel_mat,   file.path(p_a_obs_vn,   paste0("gl_", glacier_num, "_", flowline_num, "_mean_a_obs_norm-vel_fric1.csv")),   row.names = TRUE)
+  
+  write.csv(mean_a_model_vel_mat,      file.path(p_a_model_v,  paste0("gl_", glacier_num, "_", flowline_num, "_mean_a_model_vel_fric1.csv")),      row.names = TRUE)
+  write.csv(mean_a_model_norm_vel_mat, file.path(p_a_model_vn, paste0("gl_", glacier_num, "_", flowline_num, "_mean_a_model_norm-vel_fric1.csv")), row.names = TRUE)
+  
+  write.csv(mean_a_res_vel_mat,        file.path(p_a_res_v,    paste0("gl_", glacier_num, "_", flowline_num, "_mean_a_res_vel_fric1.csv")),        row.names = TRUE)
+  
+  write.csv(mean_a_norm_factor_mat,    file.path(p_a_norm,     paste0("gl_", glacier_num, "_", flowline_num, "_mean_a_norm_factor_fric1.csv")),     row.names = TRUE)
+  
+  # Summer files — OBS
+  write.csv(mean_s_obs_vel_mat,        file.path(p_s_obs_v,    paste0("gl_", glacier_num, "_", flowline_num, "_mean_s_obs_vel_fric1.csv")),        row.names = TRUE)
+  write.csv(mean_s_obs_vel_err_mat,    file.path(p_s_obs_ve,   paste0("gl_", glacier_num, "_", flowline_num, "_mean_s_obs_vel-error_fric1.csv")),  row.names = TRUE)
+  write.csv(mean_s_obs_norm_vel_mat,   file.path(p_s_obs_vn,   paste0("gl_", glacier_num, "_", flowline_num, "_mean_s_obs_norm-vel_fric1.csv")),   row.names = TRUE)
+  write.csv(mean_s_obs_anom_mat,       file.path(p_s_obs_a,    paste0("gl_", glacier_num, "_", flowline_num, "_mean_s_obs_anom_fric1.csv")),       row.names = TRUE)
+  write.csv(mean_s_obs_norm_anom_mat,  file.path(p_s_obs_an,   paste0("gl_", glacier_num, "_", flowline_num, "_mean_s_obs_norm-anom_fric1.csv")),   row.names = TRUE)
+  
+  # Summer files — MODEL
+  write.csv(mean_s_model_vel_mat,        file.path(p_s_model_v,  paste0("gl_", glacier_num, "_", flowline_num, "_mean_s_model_vel_fric1.csv")),        row.names = TRUE)
+  write.csv(mean_s_model_norm_vel_mat,   file.path(p_s_model_vn, paste0("gl_", glacier_num, "_", flowline_num, "_mean_s_model_norm-vel_fric1.csv")),   row.names = TRUE)
+  write.csv(mean_s_model_anom_mat,       file.path(p_s_model_a,  paste0("gl_", glacier_num, "_", flowline_num, "_mean_s_model_anom_fric1.csv")),       row.names = TRUE)
+  write.csv(mean_s_model_norm_anom_mat,  file.path(p_s_model_an, paste0("gl_", glacier_num, "_", flowline_num, "_mean_s_model_norm-anom_fric1.csv")),  row.names = TRUE)
+  
+  # Summer files — RES
+  write.csv(mean_s_res_vel_mat,         file.path(p_s_res_v,   paste0("gl_", glacier_num, "_", flowline_num, "_mean_s_res_vel_fric1.csv")),         row.names = TRUE)
+  write.csv(mean_s_res_anom_mat,        file.path(p_s_res_a,   paste0("gl_", glacier_num, "_", flowline_num, "_mean_s_res_anom_fric1.csv")),        row.names = TRUE)
+  write.csv(mean_s_res_norm_anom_mat,   file.path(p_s_res_an,  paste0("gl_", glacier_num, "_", flowline_num, "_mean_s_res_norm-anom_fric1.csv")),   row.names = TRUE)
+  
+  # Summer — Normalisation factor
+  write.csv(mean_s_norm_factor_mat,     file.path(p_s_norm,    paste0("gl_", glacier_num, "_", flowline_num, "_mean_s_norm_factor_fric1.csv")),     row.names = TRUE)
+  
+  cat("Saved annual & summer matrices (incl. norm factor) to:", base_dir, "\n")
+  ##### 8g. SUMMER DIFF: (RES NORM-ANOM − MODEL NORM-ANOM) * SUMMER NORM FACTOR + HEATMAP #####
+  
+  base_dir <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Mean Velocities"
+  
+  # Inputs per spec
+  file_model_norm_anom <- file.path(base_dir, "Summer/Model/Mean Anomaly Norm Norm",
+                                    paste0("gl_", glacier_num, "_", flowline_num, "_mean_s_model_norm-anom_fric1.csv"))
+  file_res_norm_anom   <- file.path(base_dir, "Summer/Res/Mean Anomaly Norm",
+                                    paste0("gl_", glacier_num, "_", flowline_num, "_mean_s_res_norm-anom_fric1.csv"))
+  file_norm_factor_s   <- file.path(base_dir, "Summer/Res/Norm/Normalisation Factor",
+                                    paste0("gl_", glacier_num, "_", flowline_num, "_mean_s_norm_factor_fric1.csv"))
+  
+  # Read matrices
+  model_norm_anom_mat <- as.matrix(read.csv(file_model_norm_anom, row.names = 1, check.names = FALSE))
+  res_norm_anom_mat   <- as.matrix(read.csv(file_res_norm_anom,   row.names = 1, check.names = FALSE))
+  norm_factor_s_mat   <- as.matrix(read.csv(file_norm_factor_s,   row.names = 1, check.names = FALSE))
+  
+  # Align shapes
+  common_years <- Reduce(intersect, list(rownames(model_norm_anom_mat), rownames(res_norm_anom_mat), rownames(norm_factor_s_mat)))
+  common_elevs <- Reduce(intersect, list(colnames(model_norm_anom_mat), colnames(res_norm_anom_mat), colnames(norm_factor_s_mat)))
+  
+  model_norm_anom_mat <- model_norm_anom_mat[common_years, common_elevs, drop = FALSE]
+  res_norm_anom_mat   <- res_norm_anom_mat[common_years,   common_elevs, drop = FALSE]
+  norm_factor_s_mat   <- norm_factor_s_mat[common_years,   common_elevs, drop = FALSE]
+  
+  # Compute: (3c - 2d) * 4a
+  diff_mat <- (res_norm_anom_mat - model_norm_anom_mat) * norm_factor_s_mat
+  
+  # Save CSV
+  out_csv_dir <- file.path(base_dir, "Summer/Diff/Mean Anomaly Norm/CSV")
+  if (!dir.exists(out_csv_dir)) dir.create(out_csv_dir, recursive = TRUE)
+  diff_csv_path <- file.path(out_csv_dir,
+                             paste0("gl_", glacier_num, "_", flowline_num, "_mean_s_res-model_norm-anom_diff_fric1.csv"))
+  write.csv(diff_mat, diff_csv_path, row.names = TRUE)
+  cat("Saved summer diff matrix to:", diff_csv_path, "\n")
+  
+  # Heatmap (same style as above heatmaps; linear symmetric from -max(abs) to +max(abs))
+  out_graph_dir <- file.path(base_dir, "Summer/Diff/Mean Anomaly Norm/Graphs")
+  if (!dir.exists(out_graph_dir)) dir.create(out_graph_dir, recursive = TRUE)
+  pdf_file_path <- file.path(out_graph_dir,
+                             paste0("gl_", glacier_num, "_", flowline_num, "_mean_s_res-model_norm-anom_diff_fric1.pdf"))
+  
+  pdf(pdf_file_path, width = 11.5, height = 4)
+  par(mar = c(0.2, 0.2, 0.2, 0.75), oma = c(4.5, 4, 1.5, 0.75))
+  
+  years_vec <- rownames(diff_mat)
+  elevs_vec <- as.numeric(colnames(diff_mat))
+  rev_years <- rev(years_vec)
+  diff_reordered <- diff_mat[rev_years, , drop = FALSE]
+  
+  M <- suppressWarnings(max(abs(diff_reordered), na.rm = TRUE))
+  if (!is.finite(M) || M == 0) M <- 1
+  breaks <- seq(-M, M, length.out = 1000)
+  color_palette <- colorRampPalette(c("#364B9A", "#EAECCC", "#A50026"))(length(breaks) - 1)
+  
+  layout(matrix(c(1,2), nrow = 1), widths = c(5.8, 0.5))
+  
+  image(1:length(elevs_vec), 1:length(rev_years), t(diff_reordered),
+        col = color_palette, breaks = breaks, axes = FALSE, xlab = "", ylab = "")
+  
+  rect(xleft = 0.5, xright = length(elevs_vec) + 0.5,
+       ybottom = 0.5, ytop = length(rev_years) + 0.5,
+       border = "black", lwd = 2)
+  
+  axis(1, at = 1:length(elevs_vec), labels = paste0(elevs_vec, "m"),
+       las = 2, tck = -0.04, lwd = 0, lwd.ticks = 1, cex.axis = 1)
+  axis(2, at = 1:length(rev_years), labels = rev_years,
+       las = 1, tck = -0.04, lwd = 0, lwd.ticks = 1, cex.axis = 1)
+  
+  mtext("year of study", side = 2, line = 3, outer = TRUE, cex = 1.1)
+  mtext("elevation band", side = 1, line = 3.5, outer = TRUE, cex = 1.1)
+  mtext(paste0(folder_name, " - ", glacier_name), side = 3, line = 0, outer = TRUE, cex = 1.3)
+  
+  par(mar = c(0.2, 0, 0.2, 2.75))
+  legend_vals <- matrix(seq(-M, M, length.out = 1000), nrow = 1)
+  image(1, seq(-M, M, length.out = 1000), legend_vals,
+        col = color_palette, breaks = breaks, axes = FALSE, xlab = "", ylab = "")
+  axis(4, at = pretty(c(-M, M), n = 5), labels = pretty(c(-M, M), n = 5), las = 1, cex.axis = 0.8, line = 0.1)
+  mtext("res − model (norm anomaly) × norm factor", side = 4, line = 2.25, cex = 0.8)
+  rect(xleft = 0.6, xright = 1.4, ybottom = -M, ytop = M, border = "black", lwd = 2)
+  
+  dev.off()
+  cat("Heatmap saved at:", pdf_file_path, "\n")
+  ##### 8h. SUMMER − ANNUAL (MODEL VELOCITY): DIFF, % CHANGE, HEATMAP #####
+  
+  base_dir <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Mean Velocities"
+  
+  # Input CSVs
+  file_model_a <- file.path(base_dir, "Annual/Model/Mean V",
+                            paste0("gl_", glacier_num, "_", flowline_num, "_mean_a_model_vel_fric1.csv"))
+  file_model_s <- file.path(base_dir, "Summer/Model/Mean V",
+                            paste0("gl_", glacier_num, "_", flowline_num, "_mean_s_model_vel_fric1.csv"))
+  
+  # Read matrices
+  model_a_mat <- as.matrix(read.csv(file_model_a, row.names = 1, check.names = FALSE))
+  model_s_mat <- as.matrix(read.csv(file_model_s, row.names = 1, check.names = FALSE))
+  
+  # Align shapes
+  common_years <- intersect(rownames(model_a_mat), rownames(model_s_mat))
+  common_elevs <- intersect(colnames(model_a_mat), colnames(model_s_mat))
+  model_a_mat <- model_a_mat[common_years, common_elevs, drop = FALSE]
+  model_s_mat <- model_s_mat[common_years, common_elevs, drop = FALSE]
+  
+  # Compute summer − annual (absolute difference)
+  diff_model_mat <- model_s_mat - model_a_mat
+  
+  # Compute % change relative to annual: 100 * (summer − annual) / annual
+  prc_model_mat <- matrix(NA_real_,
+                          nrow = nrow(diff_model_mat),
+                          ncol = ncol(diff_model_mat),
+                          dimnames = dimnames(diff_model_mat))
+  den <- model_a_mat
+  mask <- is.finite(den) & den != 0
+  prc_model_mat[mask] <- 100 * diff_model_mat[mask] / den[mask]
+  
+  # Save CSVs
+  out_csv_diff_dir <- file.path(base_dir, "Summer/Diff/Model Vel/CSV")
+  out_csv_prc_dir  <- file.path(base_dir, "Summer/Diff/Model Vel Prc/CSV")
+  if (!dir.exists(out_csv_diff_dir)) dir.create(out_csv_diff_dir, recursive = TRUE)
+  if (!dir.exists(out_csv_prc_dir))  dir.create(out_csv_prc_dir,  recursive = TRUE)
+  
+  diff_csv_path <- file.path(out_csv_diff_dir,
+                             paste0("gl_", glacier_num, "_", flowline_num, "_mean_s-a_model_vel_fric1.csv"))
+  prc_csv_path  <- file.path(out_csv_prc_dir,
+                             paste0("gl_", glacier_num, "_", flowline_num, "_mean_s-a_model_vel_prc_fric1.csv"))
+  write.csv(diff_model_mat, diff_csv_path, row.names = TRUE)
+  write.csv(prc_model_mat,  prc_csv_path,  row.names = TRUE)
+  cat("Saved model summer−annual diff CSV to:", diff_csv_path, "\n")
+  cat("Saved model summer−annual % CSV to:",   prc_csv_path,  "\n")
+  
+  # Heatmap of % change (symmetric ± max|%|)
+  out_graph_dir <- file.path(base_dir, "Summer/Diff/Model Vel Prc/Graphs")
+  if (!dir.exists(out_graph_dir)) dir.create(out_graph_dir, recursive = TRUE)
+  pdf_file_path <- file.path(out_graph_dir,
+                             paste0("gl_", glacier_num, "_", flowline_num, "_mean_s-a_model_vel_prc_fric1.pdf"))
+  
+  # Prepare data for plotting
+  years_vec <- rownames(prc_model_mat)
+  elevs_vec <- as.numeric(colnames(prc_model_mat))
+  rev_years <- rev(years_vec)
+  prc_reordered <- prc_model_mat[rev_years, , drop = FALSE]
+  
+  # Dynamic symmetric scale
+  M <- suppressWarnings(max(abs(prc_reordered), na.rm = TRUE))
+  if (!is.finite(M) || M == 0) M <- 1
+  
+  # Plot
+  pdf(pdf_file_path, width = 11.5, height = 4)
+  par(mar = c(0.2, 0.2, 0.2, 0.75), oma = c(4.5, 4, 1.5, 0.75))
+  breaks <- seq(-M, M, length.out = 1000)
+  color_palette <- colorRampPalette(c("#364B9A", "#EAECCC", "#A50026"))(length(breaks) - 1)
+  layout(matrix(c(1,2), nrow = 1), widths = c(5.8, 0.5))
+  
+  image(1:length(elevs_vec), 1:length(rev_years), t(prc_reordered),
+        col = color_palette, breaks = breaks, axes = FALSE, xlab = "", ylab = "")
+  
+  rect(xleft = 0.5, xright = length(elevs_vec) + 0.5,
+       ybottom = 0.5, ytop = length(rev_years) + 0.5,
+       border = "black", lwd = 2)
+  
+  axis(1, at = 1:length(elevs_vec), labels = paste0(elevs_vec, "m"),
+       las = 2, tck = -0.04, lwd = 0, lwd.ticks = 1, cex.axis = 1)
+  axis(2, at = 1:length(rev_years), labels = rev_years,
+       las = 1, tck = -0.04, lwd = 0, lwd.ticks = 1, cex.axis = 1)
+  
+  mtext("year of study", side = 2, line = 3,  outer = TRUE, cex = 1.1)
+  mtext("elevation band", side = 1, line = 3.5, outer = TRUE, cex = 1.1)
+  mtext(paste0(folder_name, " - ", glacier_name), side = 3, line = 0, outer = TRUE, cex = 1.3)
+  
+  par(mar = c(0.2, 0, 0.2, 2.75))
+  legend_vals <- matrix(seq(-M, M, length.out = 1000), nrow = 1)
+  image(1, seq(-M, M, length.out = 1000), legend_vals,
+        col = color_palette, breaks = breaks, axes = FALSE, xlab = "", ylab = "")
+  axis(4, at = pretty(c(-M, M), n = 5),
+       labels = paste0(pretty(c(-M, M), n = 5), "%"),
+       las = 1, cex.axis = 0.8, line = 0.1)
+  mtext("summer − annual (% of annual)", side = 4, line = 2.25, cex = 0.8)
+  rect(xleft = 0.6, xright = 1.4, ybottom = -M, ytop = M, border = "black", lwd = 2)
+  
+  dev.off()
+  cat("Model % heatmap saved at:", pdf_file_path, "\n")
+  ##### 8i. SUMMER − ANNUAL (RESIDUAL VELOCITY): DIFF, % CHANGE, HEATMAP #####
+  
+  base_dir <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Mean Velocities"
+  
+  # Input CSVs
+  file_res_a <- file.path(base_dir, "Annual/Res/Mean V",
+                          paste0("gl_", glacier_num, "_", flowline_num, "_mean_a_res_vel_fric1.csv"))
+  file_res_s <- file.path(base_dir, "Summer/Res/Mean V",
+                          paste0("gl_", glacier_num, "_", flowline_num, "_mean_s_res_vel_fric1.csv"))
+  
+  # Read matrices
+  res_a_mat <- as.matrix(read.csv(file_res_a, row.names = 1, check.names = FALSE))
+  res_s_mat <- as.matrix(read.csv(file_res_s, row.names = 1, check.names = FALSE))
+  
+  # Align shapes
+  common_years <- intersect(rownames(res_a_mat), rownames(res_s_mat))
+  common_elevs <- intersect(colnames(res_a_mat), colnames(res_s_mat))
+  res_a_mat <- res_a_mat[common_years, common_elevs, drop = FALSE]
+  res_s_mat <- res_s_mat[common_years, common_elevs, drop = FALSE]
+  
+  # Compute summer − annual (absolute difference)
+  diff_res_mat <- res_s_mat - res_a_mat
+  
+  # Compute % change relative to annual
+  prc_res_mat <- matrix(NA_real_,
+                        nrow = nrow(diff_res_mat),
+                        ncol = ncol(diff_res_mat),
+                        dimnames = dimnames(diff_res_mat))
+  den <- res_a_mat
+  mask <- is.finite(den) & den != 0
+  prc_res_mat[mask] <- 100 * diff_res_mat[mask] / den[mask]
+  
+  # Save CSVs
+  out_csv_diff_dir <- file.path(base_dir, "Summer/Diff/Res Vel/CSV")
+  out_csv_prc_dir  <- file.path(base_dir, "Summer/Diff/Res Vel Prc/CSV")
+  if (!dir.exists(out_csv_diff_dir)) dir.create(out_csv_diff_dir, recursive = TRUE)
+  if (!dir.exists(out_csv_prc_dir))  dir.create(out_csv_prc_dir,  recursive = TRUE)
+  
+  diff_csv_path <- file.path(out_csv_diff_dir,
+                             paste0("gl_", glacier_num, "_", flowline_num, "_mean_s-a_res_vel_fric1.csv"))
+  prc_csv_path  <- file.path(out_csv_prc_dir,
+                             paste0("gl_", glacier_num, "_", flowline_num, "_mean_s-a_res_vel_prc_fric1.csv"))
+  write.csv(diff_res_mat, diff_csv_path, row.names = TRUE)
+  write.csv(prc_res_mat,  prc_csv_path,  row.names = TRUE)
+  cat("Saved residual summer−annual diff CSV to:", diff_csv_path, "\n")
+  cat("Saved residual summer−annual % CSV to:",   prc_csv_path,  "\n")
+  
+  # Heatmap of % change (symmetric ± max|%|)
+  # NOTE: You asked to save in 'Resl Vel Prc/Graphs' (with an 'l').
+  # We'll create that exact folder to match your spec.
+  out_graph_dir <- file.path(base_dir, "Summer/Diff/Res Vel Prc/Graphs")
+  if (!dir.exists(out_graph_dir)) dir.create(out_graph_dir, recursive = TRUE)
+  pdf_file_path <- file.path(out_graph_dir,
+                             paste0("gl_", glacier_num, "_", flowline_num, "_mean_s-a_res_vel_prc_fric1.pdf"))
+  
+  years_vec <- rownames(prc_res_mat)
+  elevs_vec <- as.numeric(colnames(prc_res_mat))
+  rev_years <- rev(years_vec)
+  prc_reordered <- prc_res_mat[rev_years, , drop = FALSE]
+  
+  M <- suppressWarnings(max(abs(prc_reordered), na.rm = TRUE))
+  if (!is.finite(M) || M == 0) M <- 1
+  breaks <- seq(-M, M, length.out = 1000)
+  color_palette <- colorRampPalette(c("#364B9A", "#EAECCC", "#A50026"))(length(breaks) - 1)
+  
+  pdf(pdf_file_path, width = 11.5, height = 4)
+  par(mar = c(0.2, 0.2, 0.2, 0.75), oma = c(4.5, 4, 1.5, 0.75))
+  layout(matrix(c(1,2), nrow = 1), widths = c(5.8, 0.5))
+  
+  image(1:length(elevs_vec), 1:length(rev_years), t(prc_reordered),
+        col = color_palette, breaks = breaks, axes = FALSE, xlab = "", ylab = "")
+  
+  rect(xleft = 0.5, xright = length(elevs_vec) + 0.5,
+       ybottom = 0.5, ytop = length(rev_years) + 0.5,
+       border = "black", lwd = 2)
+  
+  axis(1, at = 1:length(elevs_vec), labels = paste0(elevs_vec, "m"),
+       las = 2, tck = -0.04, lwd = 0, lwd.ticks = 1, cex.axis = 1)
+  axis(2, at = 1:length(rev_years), labels = rev_years,
+       las = 1, tck = -0.04, lwd = 0, lwd.ticks = 1, cex.axis = 1)
+  
+  mtext("year of study", side = 2, line = 3,  outer = TRUE, cex = 1.1)
+  mtext("elevation band", side = 1, line = 3.5, outer = TRUE, cex = 1.1)
+  mtext(paste0(folder_name, " - ", glacier_name), side = 3, line = 0, outer = TRUE, cex = 1.3)
+  
+  par(mar = c(0.2, 0, 0.2, 2.75))
+  legend_vals <- matrix(seq(-M, M, length.out = 1000), nrow = 1)
+  image(1, seq(-M, M, length.out = 1000), legend_vals,
+        col = color_palette, breaks = breaks, axes = FALSE, xlab = "", ylab = "")
+  axis(4, at = pretty(c(-M, M), n = 5),
+       labels = paste0(pretty(c(-M, M), n = 5), "%"),
+       las = 1, cex.axis = 0.8, line = 0.1)
+  mtext("summer − annual (% of annual)", side = 4, line = 2.25, cex = 0.8)
+  rect(xleft = 0.6, xright = 1.4, ybottom = -M, ytop = M, border = "black", lwd = 2)
+  
+  dev.off()
+  cat("Residual % heatmap saved at:", pdf_file_path, "\n")
+  ##### 8j. RSF% = 100 * ( summer residual mean / annual model mean ) + HEATMAP #####
+  
+  base_dir <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Mean Velocities"
+  
+  # Inputs
+  file_res_s <- file.path(base_dir, "Summer/Res/Mean V",
+                          paste0("gl_", glacier_num, "_", flowline_num, "_mean_s_res_vel_fric1.csv"))
+  file_mod_a <- file.path(base_dir, "Annual/Model/Mean V",
+                          paste0("gl_", glacier_num, "_", flowline_num, "_mean_a_model_vel_fric1.csv"))
+  
+  # Read
+  res_s_mat <- as.matrix(read.csv(file_res_s, row.names = 1, check.names = FALSE))
+  mod_a_mat <- as.matrix(read.csv(file_mod_a, row.names = 1, check.names = FALSE))
+  
+  # Align shapes
+  common_years <- intersect(rownames(res_s_mat), rownames(mod_a_mat))
+  common_elevs <- intersect(colnames(res_s_mat), colnames(mod_a_mat))
+  res_s_mat <- res_s_mat[common_years, common_elevs, drop = FALSE]
+  mod_a_mat <- mod_a_mat[common_years, common_elevs, drop = FALSE]
+  
+  # RSF% = 100 * res_s / mod_a
+  rsf_prc_mat <- matrix(NA_real_, nrow = nrow(res_s_mat), ncol = ncol(res_s_mat),
+                        dimnames = dimnames(res_s_mat))
+  den_mask <- is.finite(mod_a_mat) & mod_a_mat != 0
+  rsf_prc_mat[den_mask] <- 100 * res_s_mat[den_mask] / mod_a_mat[den_mask]
+  
+  # Save CSV
+  out_csv_dir <- file.path(base_dir, "Summer/Diff/RSF/CSV")
+  if (!dir.exists(out_csv_dir)) dir.create(out_csv_dir, recursive = TRUE)
+  rsf_csv_path <- file.path(out_csv_dir,
+                            paste0("gl_", glacier_num, "_", flowline_num, "_rsf_prc_fric1.csv"))
+  write.csv(rsf_prc_mat, rsf_csv_path, row.names = TRUE)
+  cat("Saved RSF% matrix to:", rsf_csv_path, "\n")
+  
+  # Heatmap (symmetric ± max|%|)
+  out_graph_dir <- file.path(base_dir, "Summer/Diff/RSF/Graphs")
+  if (!dir.exists(out_graph_dir)) dir.create(out_graph_dir, recursive = TRUE)
+  pdf_file_path <- file.path(out_graph_dir,
+                             paste0("gl_", glacier_num, "_", flowline_num, "_rsf_prc_fric1.pdf"))
+  
+  years_vec <- rownames(rsf_prc_mat)
+  elevs_vec <- as.numeric(colnames(rsf_prc_mat))
+  rev_years <- rev(years_vec)
+  rsf_reordered <- rsf_prc_mat[rev_years, , drop = FALSE]
+  
+  M <- suppressWarnings(max(abs(rsf_reordered), na.rm = TRUE))
+  if (!is.finite(M) || M == 0) M <- 1
+  breaks <- seq(-M, M, length.out = 1000)
+  color_palette <- colorRampPalette(c("#364B9A", "#EAECCC", "#A50026"))(length(breaks) - 1)
+  
+  pdf(pdf_file_path, width = 11.5, height = 4)
+  par(mar = c(0.2, 0.2, 0.2, 0.75), oma = c(4.5, 4, 1.5, 0.75))
+  layout(matrix(c(1,2), nrow = 1), widths = c(5.8, 0.5))
+  
+  image(1:length(elevs_vec), 1:length(rev_years), t(rsf_reordered),
+        col = color_palette, breaks = breaks, axes = FALSE, xlab = "", ylab = "")
+  rect(xleft = 0.5, xright = length(elevs_vec) + 0.5,
+       ybottom = 0.5, ytop = length(rev_years) + 0.5, border = "black", lwd = 2)
+  
+  axis(1, at = 1:length(elevs_vec), labels = paste0(elevs_vec, "m"),
+       las = 2, tck = -0.04, lwd = 0, lwd.ticks = 1, cex.axis = 1)
+  axis(2, at = 1:length(rev_years), labels = rev_years,
+       las = 1, tck = -0.04, lwd = 0, lwd.ticks = 1, cex.axis = 1)
+  
+  mtext("year of study", side = 2, line = 3, outer = TRUE, cex = 1.1)
+  mtext("elevation band", side = 1, line = 3.5, outer = TRUE, cex = 1.1)
+  mtext(paste0(folder_name, " - ", glacier_name), side = 3, line = 0, outer = TRUE, cex = 1.3)
+  
+  par(mar = c(0.2, 0, 0.2, 2.75))
+  legend_vals <- matrix(seq(-M, M, length.out = 1000), nrow = 1)
+  image(1, seq(-M, M, length.out = 1000), legend_vals,
+        col = color_palette, breaks = breaks, axes = FALSE, xlab = "", ylab = "")
+  pretty_ticks <- pretty(c(-M, M), n = 5)
+  axis(4, at = pretty_ticks, labels = paste0(pretty_ticks, "%"),
+       las = 1, cex.axis = 0.8, line = 0.1)
+  mtext("RSF% = 100 × summer residual / annual model", side = 4, line = 2.25, cex = 0.8)
+  rect(xleft = 0.6, xright = 1.4, ybottom = -M, ytop = M, border = "black", lwd = 2)
+  
+  dev.off()
+  cat("RSF% heatmap saved at:", pdf_file_path, "\n")
+  ##### 8k. SDB% = 100 * ( (summer residual − annual residual) / annual model mean ) + HEATMAP #####
+  
+  base_dir <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Mean Velocities"
+  
+  # Inputs
+  file_res_s <- file.path(base_dir, "Summer/Res/Mean V",
+                          paste0("gl_", glacier_num, "_", flowline_num, "_mean_s_res_vel_fric1.csv"))
+  file_res_a <- file.path(base_dir, "Annual/Res/Mean V",
+                          paste0("gl_", glacier_num, "_", flowline_num, "_mean_a_res_vel_fric1.csv"))
+  file_mod_a <- file.path(base_dir, "Annual/Model/Mean V",
+                          paste0("gl_", glacier_num, "_", flowline_num, "_mean_a_model_vel_fric1.csv"))
+  
+  # Read
+  res_s_mat <- as.matrix(read.csv(file_res_s, row.names = 1, check.names = FALSE))
+  res_a_mat <- as.matrix(read.csv(file_res_a, row.names = 1, check.names = FALSE))
+  mod_a_mat <- as.matrix(read.csv(file_mod_a, row.names = 1, check.names = FALSE))
+  
+  # Align shapes
+  common_years <- Reduce(intersect, list(rownames(res_s_mat), rownames(res_a_mat), rownames(mod_a_mat)))
+  common_elevs <- Reduce(intersect, list(colnames(res_s_mat), colnames(res_a_mat), colnames(mod_a_mat)))
+  res_s_mat <- res_s_mat[common_years, common_elevs, drop = FALSE]
+  res_a_mat <- res_a_mat[common_years, common_elevs, drop = FALSE]
+  mod_a_mat <- mod_a_mat[common_years, common_elevs, drop = FALSE]
+  
+  # SDB% = 100 * ( (res_s − res_a) / mod_a )
+  sdb_prc_mat <- matrix(NA_real_, nrow = nrow(res_s_mat), ncol = ncol(res_s_mat),
+                        dimnames = dimnames(res_s_mat))
+  den_mask <- is.finite(mod_a_mat) & mod_a_mat != 0
+  num <- res_s_mat - res_a_mat
+  sdb_prc_mat[den_mask] <- 100 * num[den_mask] / mod_a_mat[den_mask]
+  
+  # Save CSV
+  out_csv_dir <- file.path(base_dir, "Summer/Diff/SDB/CSV")
+  if (!dir.exists(out_csv_dir)) dir.create(out_csv_dir, recursive = TRUE)
+  sdb_csv_path <- file.path(out_csv_dir,
+                            paste0("gl_", glacier_num, "_", flowline_num, "_sdb_prc_fric1.csv"))
+  write.csv(sdb_prc_mat, sdb_csv_path, row.names = TRUE)
+  cat("Saved SDB% matrix to:", sdb_csv_path, "\n")
+  
+  # Heatmap (symmetric ± max|%|)
+  out_graph_dir <- file.path(base_dir, "Summer/Diff/SDB/Graphs")
+  if (!dir.exists(out_graph_dir)) dir.create(out_graph_dir, recursive = TRUE)
+  pdf_file_path <- file.path(out_graph_dir,
+                             paste0("gl_", glacier_num, "_", flowline_num, "_sdb_prc_fric1.pdf"))
+  
+  years_vec <- rownames(sdb_prc_mat)
+  elevs_vec <- as.numeric(colnames(sdb_prc_mat))
+  rev_years <- rev(years_vec)
+  sdb_reordered <- sdb_prc_mat[rev_years, , drop = FALSE]
+  
+  M <- suppressWarnings(max(abs(sdb_reordered), na.rm = TRUE))
+  if (!is.finite(M) || M == 0) M <- 1
+  breaks <- seq(-M, M, length.out = 1000)
+  color_palette <- colorRampPalette(c("#364B9A", "#EAECCC", "#A50026"))(length(breaks) - 1)
+  
+  pdf(pdf_file_path, width = 11.5, height = 4)
+  par(mar = c(0.2, 0.2, 0.2, 0.75), oma = c(4.5, 4, 1.5, 0.75))
+  layout(matrix(c(1,2), nrow = 1), widths = c(5.8, 0.5))
+  
+  image(1:length(elevs_vec), 1:length(rev_years), t(sdb_reordered),
+        col = color_palette, breaks = breaks, axes = FALSE, xlab = "", ylab = "")
+  rect(xleft = 0.5, xright = length(elevs_vec) + 0.5,
+       ybottom = 0.5, ytop = length(rev_years) + 0.5, border = "black", lwd = 2)
+  
+  axis(1, at = 1:length(elevs_vec), labels = paste0(elevs_vec, "m"),
+       las = 2, tck = -0.04, lwd = 0, lwd.ticks = 1, cex.axis = 1)
+  axis(2, at = 1:length(rev_years), labels = rev_years,
+       las = 1, tck = -0.04, lwd = 0, lwd.ticks = 1, cex.axis = 1)
+  
+  mtext("year of study", side = 2, line = 3, outer = TRUE, cex = 1.1)
+  mtext("elevation band", side = 1, line = 3.5, outer = TRUE, cex = 1.1)
+  mtext(paste0(folder_name, " - ", glacier_name), side = 3, line = 0, outer = TRUE, cex = 1.3)
+  
+  par(mar = c(0.2, 0, 0.2, 2.75))
+  legend_vals <- matrix(seq(-M, M, length.out = 1000), nrow = 1)
+  image(1, seq(-M, M, length.out = 1000), legend_vals,
+        col = color_palette, breaks = breaks, axes = FALSE, xlab = "", ylab = "")
+  pretty_ticks <- pretty(c(-M, M), n = 5)
+  axis(4, at = pretty_ticks, labels = paste0(pretty_ticks, "%"),
+       las = 1, cex.axis = 0.8, line = 0.1)
+  mtext("SDB% = 100 × (summer residual − annual residual) / annual model", side = 4, line = 2.25, cex = 0.8)
+  rect(xleft = 0.6, xright = 1.4, ybottom = -M, ytop = M, border = "black", lwd = 2)
+  
+  dev.off()
+  cat("SDB% heatmap saved at:", pdf_file_path, "\n")
+  ##### 8l. Pooled-baseline residual seasonal effect (Δr) + CSVs + Heatmap #####
+  
+  base_dir <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Mean Velocities"
+  mk <- function(p) if (!dir.exists(p)) dir.create(p, recursive = TRUE)
+  
+  # Load matrices saved in 8f
+  O_a <- as.matrix(read.csv(file.path(base_dir, "Annual/Obs/Mean V",
+                                      paste0("gl_", glacier_num, "_", flowline_num, "_mean_a_obs_vel_fric1.csv")),
+                            row.names = 1, check.names = FALSE))
+  O_s <- as.matrix(read.csv(file.path(base_dir, "Summer/Obs/Mean V",
+                                      paste0("gl_", glacier_num, "_", flowline_num, "_mean_s_obs_vel_fric1.csv")),
+                            row.names = 1, check.names = FALSE))
+  M_a <- as.matrix(read.csv(file.path(base_dir, "Annual/Model/Mean V",
+                                      paste0("gl_", glacier_num, "_", flowline_num, "_mean_a_model_vel_fric1.csv")),
+                            row.names = 1, check.names = FALSE))
+  M_s <- as.matrix(read.csv(file.path(base_dir, "Summer/Model/Mean V",
+                                      paste0("gl_", glacier_num, "_", flowline_num, "_mean_s_model_vel_fric1.csv")),
+                            row.names = 1, check.names = FALSE))
+  
+  # Align common dimensions
+  common_years <- Reduce(intersect, list(rownames(O_a), rownames(O_s), rownames(M_a), rownames(M_s)))
+  common_elevs <- Reduce(intersect, list(colnames(O_a), colnames(O_s), colnames(M_a), colnames(M_s)))
+  O_a <- O_a[common_years, common_elevs, drop = FALSE]
+  O_s <- O_s[common_years, common_elevs, drop = FALSE]
+  M_a <- M_a[common_years, common_elevs, drop = FALSE]
+  M_s <- M_s[common_years, common_elevs, drop = FALSE]
+  
+  # Compute Δr in m/yr
+  Delta_r <- (O_s - O_a) - (M_s - M_a)
+  
+  # Pooled baseline B = 0.5 * (O_a + M_a), ensure finite and non-zero
+  B <- 0.5 * (O_a + M_a)
+  Delta_r_pct <- matrix(NA_real_, nrow = nrow(Delta_r), ncol = ncol(Delta_r), dimnames = dimnames(Delta_r))
+  mask <- is.finite(B) & (B != 0)
+  Delta_r_pct[mask] <- 100 * Delta_r[mask] / B[mask]
+  
+  # Save CSVs
+  out_csv_abs <- file.path(base_dir, "Summer/Diff/Residual Pooled Baseline/CSV"); mk(out_csv_abs)
+  out_csv_pct <- out_csv_abs  # keep CSVs together; absolute + percent in same subfolder
+  abs_csv_path <- file.path(out_csv_abs, paste0("gl_", glacier_num, "_", flowline_num, "_res_s-a_pooled_mpery_fric1.csv"))
+  pct_csv_path <- file.path(out_csv_pct, paste0("gl_", glacier_num, "_", flowline_num, "_res_s-a_pooled_prc_fric1.csv"))
+  write.csv(Delta_r,     abs_csv_path, row.names = TRUE)
+  write.csv(Delta_r_pct, pct_csv_path, row.names = TRUE)
+  cat("Saved pooled-baseline Δr CSVs to:", out_csv_abs, "\n")
+  
+  # Heatmap (percent), symmetric ± max|%|
+  out_graph_dir <- file.path(base_dir, "Summer/Diff/Residual Pooled Baseline/Graphs"); mk(out_graph_dir)
+  pdf_file_path <- file.path(out_graph_dir, paste0("gl_", glacier_num, "_", flowline_num, "_res_s-a_pooled_prc_fric1.pdf"))
+  
+  years_vec <- rownames(Delta_r_pct)
+  elevs_vec <- as.numeric(colnames(Delta_r_pct))
+  rev_years <- rev(years_vec)
+  mat_plot  <- Delta_r_pct[rev_years, , drop = FALSE]
+  
+  M <- suppressWarnings(max(abs(mat_plot), na.rm = TRUE)); if (!is.finite(M) || M == 0) M <- 1
+  breaks <- seq(-M, M, length.out = 1000)
+  color_palette <- colorRampPalette(c("#364B9A", "#EAECCC", "#A50026"))(length(breaks) - 1)
+  
+  pdf(pdf_file_path, width = 11.5, height = 4)
+  par(mar = c(0.2, 0.2, 0.2, 0.75), oma = c(4.5, 4, 1.5, 0.75))
+  layout(matrix(c(1,2), nrow = 1), widths = c(5.8, 0.5))
+  
+  # Heatmap
+  image(1:length(elevs_vec), 1:length(rev_years), t(mat_plot),
+        col = color_palette, breaks = breaks, axes = FALSE, xlab = "", ylab = "")
+  rect(xleft = 0.5, xright = length(elevs_vec) + 0.5,
+       ybottom = 0.5, ytop = length(rev_years) + 0.5, border = "black", lwd = 2)
+  axis(1, at = 1:length(elevs_vec), labels = paste0(elevs_vec, "m"),
+       las = 2, tck = -0.04, lwd = 0, lwd.ticks = 1, cex.axis = 1)
+  axis(2, at = 1:length(rev_years), labels = rev_years,
+       las = 1, tck = -0.04, lwd = 0, lwd.ticks = 1, cex.axis = 1)
+  
+  # Labels
+  mtext("year of study", side = 2, line = 3, outer = TRUE, cex = 1.1)
+  mtext("elevation band", side = 1, line = 3.5, outer = TRUE, cex = 1.1)
+  mtext(paste0(folder_name, " - ", glacier_name), side = 3, line = 0, outer = TRUE, cex = 1.3)
+  
+  # Legend
+  par(mar = c(0.2, 0, 0.2, 2.75))
+  legend_vals <- matrix(seq(-M, M, length.out = 1000), nrow = 1)
+  image(1, seq(-M, M, length.out = 1000), legend_vals,
+        col = color_palette, breaks = breaks, axes = FALSE, xlab = "", ylab = "")
+  axis(4, at = pretty(c(-M, M), n = 5), labels = paste0(pretty(c(-M, M), n = 5), "%"),
+       las = 1, cex.axis = 0.8, line = 0.1)
+  mtext("Δr (summer−annual) as % of pooled baseline", side = 4, line = 2.25, cex = 0.8)
+  rect(xleft = 0.6, xright = 1.4, ybottom = -M, ytop = M, border = "black", lwd = 2)
+  
+  dev.off()
+  cat("Heatmap saved at:", pdf_file_path, "\n")
+  ##### 8m. SUMMER PEAK DATES (OBS/MODEL/RES) + TIMING DIFF & HEATMAP #####
+  
+  # Use existing ranges if defined; otherwise define
+  if (!exists("years"))      years <- 2016:2021
+  if (!exists("elevations")) elevations <- seq(100, 2100, by = 100)
+  
+  # Helpers
+  .new_mat_chr <- function() {
+    matrix(NA_character_,
+           nrow = length(years),
+           ncol = length(elevations),
+           dimnames = list(as.character(years), as.character(elevations)))
+  }
+  .new_mat_num <- function() {
+    matrix(NA_real_,
+           nrow = length(years),
+           ncol = length(elevations),
+           dimnames = list(as.character(years), as.character(elevations)))
+  }
+  .summer_mask <- function(d, yr) {
+    if (is.null(d)) return(rep(FALSE, 0))
+    d >= as.Date(paste0(yr, "-05-01")) & d <= as.Date(paste0(yr, "-09-30"))
+  }
+  .max_date <- function(dates, values) {
+    # Return the date (YYYY-MM-DD) of the first maximum value (NA if none)
+    if (is.null(dates) || is.null(values)) return(NA_character_)
+    if (length(dates) == 0 || length(values) == 0) return(NA_character_)
+    if (all(is.na(values))) return(NA_character_)
+    idx <- which(values == max(values, na.rm = TRUE))[1]
+    if (is.na(idx) || length(idx) == 0) return(NA_character_)
+    format(as.Date(dates[idx]), "%Y-%m-%d")
+  }
+  
+  # Allocate output matrices
+  max_date_obs_mat <- .new_mat_chr()  # summer max date of obs vel
+  max_date_mod_mat <- .new_mat_chr()  # summer max date of model vel
+  max_date_res_mat <- .new_mat_chr()  # summer max date of residual
+  timing_diff_days_mat <- .new_mat_num()  # obs_peak_date - res_peak_date in days
+  
+  # Compute per year × elevation
+  for (yr in years) {
+    for (elev in elevations) {
+      key <- paste0("year", yr, "_", elev)
+      
+      # Fetch subsets (if present)
+      obs    <- if (exists("data_with_anomalies_obs"))    data_with_anomalies_obs[[key]]    else NULL
+      model  <- if (exists("data_with_anomalies_model"))  data_with_anomalies_model[[key]]  else NULL
+      resdat <- if (exists("residuals_data"))             residuals_data[[key]]             else NULL
+      
+      # OBS: summer mask and max vel date
+      if (!is.null(obs) && nrow(obs) > 0) {
+        ms <- .summer_mask(obs$date, yr)
+        if (any(ms, na.rm = TRUE)) {
+          max_date_obs_mat[as.character(yr), as.character(elev)] <-
+            .max_date(obs$date[ms], obs$vel[ms])
+        }
+      }
+      
+      # MODEL: summer mask and max vel date
+      if (!is.null(model) && nrow(model) > 0) {
+        ms <- .summer_mask(model$date, yr)
+        if (any(ms, na.rm = TRUE)) {
+          max_date_mod_mat[as.character(yr), as.character(elev)] <-
+            .max_date(model$date[ms], model$vel[ms])
+        }
+      }
+      
+      # RESIDUAL: summer mask and max residual date
+      if (!is.null(resdat) && nrow(resdat) > 0) {
+        ms <- .summer_mask(resdat$date, yr)
+        if (any(ms, na.rm = TRUE)) {
+          max_date_res_mat[as.character(yr), as.character(elev)] <-
+            .max_date(resdat$date[ms], resdat$residual[ms])
+        }
+      }
+      
+      # Timing diff (days): obs_peak_date − res_peak_date
+      d_obs <- max_date_obs_mat[as.character(yr), as.character(elev)]
+      d_res <- max_date_res_mat[as.character(yr), as.character(elev)]
+      if (!is.na(d_obs) && !is.na(d_res)) {
+        timing_diff_days_mat[as.character(yr), as.character(elev)] <-
+          as.numeric(as.Date(d_obs) - as.Date(d_res))
+      }
+    }
+  }
+  
+  # Save CSVs
+  base_dir <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Max Velocities"
+  p_csv_obs    <- file.path(base_dir, "CSV/Obs")
+  p_csv_mod    <- file.path(base_dir, "CSV/Mod")
+  p_csv_res    <- file.path(base_dir, "CSV/Res")
+  p_csv_timing <- file.path(base_dir, "CSV/Timing")
+  for (p in list(p_csv_obs, p_csv_mod, p_csv_res, p_csv_timing)) if (!dir.exists(p)) dir.create(p, recursive = TRUE)
+  
+  write.csv(max_date_obs_mat,
+            file.path(p_csv_obs, paste0("gl_", glacier_num, "_", flowline_num, "_max_s_vel_obs_fric1.csv")),
+            row.names = TRUE)
+  write.csv(max_date_mod_mat,
+            file.path(p_csv_mod, paste0("gl_", glacier_num, "_", flowline_num, "_max_s_vel_model_fric1.csv")),
+            row.names = TRUE)
+  write.csv(max_date_res_mat,
+            file.path(p_csv_res, paste0("gl_", glacier_num, "_", flowline_num, "_max_s_vel_res_fric1.csv")),
+            row.names = TRUE)
+  write.csv(timing_diff_days_mat,
+            file.path(p_csv_timing, paste0("gl_", glacier_num, "_", flowline_num, "_max_s_vel_obs-res_timing_fric1.csv")),
+            row.names = TRUE)
+  
+  cat("Saved summer peak date CSVs and timing diff CSVs in:", base_dir, "\n")
+  
+  # Heatmap of timing differences (days): symmetric ± max|diff|
+  p_graph_timing <- file.path(base_dir, "Graphs/Timing")
+  if (!dir.exists(p_graph_timing)) dir.create(p_graph_timing, recursive = TRUE)
+  pdf_file_path <- file.path(p_graph_timing,
+                             paste0("gl_", glacier_num, "_", flowline_num, "_max_s_vel_obs-res_timing_fric1.pdf"))
+  
+  # Prepare data for plotting
+  years_vec <- rownames(timing_diff_days_mat)
+  elevs_vec <- as.numeric(colnames(timing_diff_days_mat))
+  rev_years <- rev(years_vec)
+  timing_plot <- timing_diff_days_mat[rev_years, , drop = FALSE]
+  
+  M <- suppressWarnings(max(abs(timing_plot), na.rm = TRUE))
+  if (!is.finite(M) || M == 0) M <- 1
+  breaks <- seq(-M, M, length.out = 1000)
+  color_palette <- colorRampPalette(c("#364B9A", "#EAECCC", "#A50026"))(length(breaks) - 1)
+  
+  pdf(pdf_file_path, width = 11.5, height = 4)
+  par(mar = c(0.2, 0.2, 0.2, 0.75), oma = c(4.5, 4, 1.5, 0.75))
+  layout(matrix(c(1,2), nrow = 1), widths = c(5.8, 0.5))
+  
+  image(1:length(elevs_vec), 1:length(rev_years), t(timing_plot),
+        col = color_palette, breaks = breaks, axes = FALSE, xlab = "", ylab = "")
+  rect(xleft = 0.5, xright = length(elevs_vec) + 0.5,
+       ybottom = 0.5, ytop = length(rev_years) + 0.5,
+       border = "black", lwd = 2)
+  
+  axis(1, at = 1:length(elevs_vec), labels = paste0(elevs_vec, "m"),
+       las = 2, tck = -0.04, lwd = 0, lwd.ticks = 1, cex.axis = 1)
+  axis(2, at = 1:length(rev_years), labels = rev_years,
+       las = 1, tck = -0.04, lwd = 0, lwd.ticks = 1, cex.axis = 1)
+  
+  mtext("year of study", side = 2, line = 3, outer = TRUE, cex = 1.1)
+  mtext("elevation band", side = 1, line = 3.5, outer = TRUE, cex = 1.1)
+  mtext(paste0(folder_name, " - ", glacier_name), side = 3, line = 0, outer = TRUE, cex = 1.3)
+  
+  par(mar = c(0.2, 0, 0.2, 2.75))
+  legend_vals <- matrix(seq(-M, M, length.out = 1000), nrow = 1)
+  image(1, seq(-M, M, length.out = 1000), legend_vals,
+        col = color_palette, breaks = breaks, axes = FALSE, xlab = "", ylab = "")
+  axis(4, at = pretty(c(-M, M), n = 5), labels = pretty(c(-M, M), n = 5),
+       las = 1, cex.axis = 0.8, line = 0.1)
+  mtext("obs peak date − res peak date (days)", side = 4, line = 2.25, cex = 0.8)
+  rect(xleft = 0.6, xright = 1.4, ybottom = -M, ytop = M, border = "black", lwd = 2)
+  
+  dev.off()
+  cat("Timing heatmap saved at:", pdf_file_path, "\n")
+  ##### 8n. SUMMARY (UPDATED): overall, per-elevation, and per-year means of timing diffs #####
+  
+  # Helpers
+  .na_mean <- function(x) {
+    if (is.null(x)) return(NA_real_)
+    val <- suppressWarnings(mean(as.numeric(x), na.rm = TRUE))
+    if (is.nan(val)) NA_real_ else val
+  }
+  
+  # Overall mean across all years × elevations (days)
+  timing_vals <- as.numeric(timing_diff_days_mat)
+  mean_overall <- .na_mean(timing_vals)
+  
+  # Determine which elevations/years are actually present in the matrix
+  present_elevs <- intersect(elevations, as.numeric(colnames(timing_diff_days_mat)))
+  present_years <- intersect(years,      as.numeric(rownames(timing_diff_days_mat)))
+  
+  # Per-elevation means (columns)
+  elev_means <- setNames(
+    lapply(present_elevs, function(ev) .na_mean(timing_diff_days_mat[, as.character(ev)])),
+    paste0("mean_elev_", present_elevs)
+  )
+  
+  # Per-year means (rows)
+  year_means <- setNames(
+    lapply(present_years, function(yr) .na_mean(timing_diff_days_mat[as.character(yr), ])),
+    paste0("mean_year_", present_years)
+  )
+  
+  # Build the summary row (ordered: glacier_num, flowline_num, mean_overall, elevs..., years...)
+  summary_row <- data.frame(
+    glacier_num  = glacier_num,
+    flowline_num = flowline_num,
+    mean_overall = mean_overall,
+    check.names = FALSE
+  )
+  # Append elev/year columns
+  for (nm in names(elev_means)) summary_row[[nm]] <- elev_means[[nm]]
+  for (nm in names(year_means)) summary_row[[nm]] <- year_means[[nm]]
+  
+  # Output path
+  summary_dir  <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Max Velocities/CSV/Timing"
+  summary_file <- file.path(summary_dir, "max_s_timing_all.csv")
+  if (!dir.exists(summary_dir)) dir.create(summary_dir, recursive = TRUE)
+  
+  # Append or update (by glacier_num + flowline_num); migrate old schema if needed
+  if (file.exists(summary_file)) {
+    existing <- tryCatch(read.csv(summary_file, stringsAsFactors = FALSE, check.names = FALSE), error = function(e) NULL)
+    
+    if (is.null(existing)) {
+      # Malformed – overwrite cleanly
+      write.csv(summary_row, summary_file, row.names = FALSE)
+    } else {
+      # If old column 'mean_days' exists but 'mean_overall' doesn't, migrate
+      if (!"mean_overall" %in% names(existing) && "mean_days" %in% names(existing)) {
+        existing$mean_overall <- existing$mean_days
+      }
+      
+      # --- REPLACE from "Order columns..." through subsetting with this ---
+      
+      # Recompute the union now that we may have added/migrated columns
+      all_cols <- union(names(existing), names(summary_row))
+      
+      # Order columns: id, overall, elevs ascending, years ascending, then any extras
+      elev_cols <- grep("^mean_elev_", all_cols, value = TRUE)
+      if (length(elev_cols)) {
+        elev_nums <- suppressWarnings(as.numeric(sub("^mean_elev_", "", elev_cols)))
+        elev_cols <- elev_cols[order(elev_nums, na.last = TRUE)]
+      }
+      
+      year_cols <- grep("^mean_year_", all_cols, value = TRUE)
+      if (length(year_cols)) {
+        year_nums <- suppressWarnings(as.numeric(sub("^mean_year_", "", year_cols)))
+        year_cols <- year_cols[order(year_nums, na.last = TRUE)]
+      }
+      
+      base_cols  <- c("glacier_num", "flowline_num", "mean_overall")
+      extra_cols <- setdiff(all_cols, c(base_cols, elev_cols, year_cols))
+      final_cols <- c(base_cols, elev_cols, year_cols, extra_cols)
+      
+      # Ensure BOTH data frames have every column in final_cols, then subset in that order
+      add_missing_cols <- function(df, cols) {
+        for (nm in cols) {
+          if (!nm %in% names(df)) df[[nm]] <- NA
+        }
+        df[, cols, drop = FALSE]
+      }
+      
+      existing    <- add_missing_cols(existing,    final_cols)
+      summary_row <- add_missing_cols(summary_row, final_cols)
+      
+      # Update or append
+      idx <- which(existing$glacier_num == glacier_num & existing$flowline_num == flowline_num)
+      if (length(idx) > 0) {
+        existing[idx, ] <- summary_row[1, ]
+      } else {
+        existing <- rbind(existing, summary_row)
+      }
+      write.csv(existing, summary_file, row.names = FALSE)
+    }
+  } else {
+    write.csv(summary_row, summary_file, row.names = FALSE)
+  }
+  
+  cat("Saved/updated timing summary (overall, per-elevation, per-year) in:", summary_file, "\n")
