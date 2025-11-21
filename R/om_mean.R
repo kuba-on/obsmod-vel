@@ -301,14 +301,14 @@ if (length(fric_plots) >= 2) {
     }
     
     # Legend panel (same style as single, larger tick labels)
-    par(mar = c(105, 0, 105, 1.5))
+    par(mar = c(115, 0, 115, 1.5))
     image(1, seq(-1, 1, length.out = 1000), matrix(seq(-1, 1, length.out = 1000), nrow = 1),
           col = color_palette, breaks = breaks, axes = FALSE, xlab = "", ylab = "")
     log_ticks  <- seq(-1, 1, by = 1)
     log_labels <- parse(text = paste0("10^", log_ticks))
     axis(4, at = log_ticks, labels = log_labels, las = 1, cex.axis = 3.5, line = 0.1)
     mtext("velocity driver", side = 4, line = 8, cex = 2.5)
-    mtext("friction                                     front", side = 4, line = -2, cex = 2.5)
+    mtext("friction                                     front", side = 4, line = -2.25, cex = 2.5)
     rect(0.6, min(log_ticks), 1.4, max(log_ticks), border = "black", lwd = 2)
     
     dev.off()
