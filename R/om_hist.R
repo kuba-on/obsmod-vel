@@ -3,7 +3,9 @@
 # The code below compares distributions of ratios of seasonality drivers obtained from different friction laws. The processing includes:
 # - Reading CSV files containing all ratio data for different friction laws.
 # - Plotting overlaid histograms with transparency, grouped by year, elevation, flowline, and globally with all data combined.
+# - Plotting includes a histogram to be used as a manuscript figure, showing the distribution of ratios by elevation for each friction law, with a shared Y-axis limit across all elevations.
 # - Plots contain vertical lines at the mean of each distribution.
+
 
 ########################################
 # Directories (unchanged)
