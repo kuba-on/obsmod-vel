@@ -110,7 +110,7 @@ for (obs_data_path in glacier_folders) {
   }
   
   # Function to normalize a vector using min-max normalization
-  normalize_min_max <- function(x) {
+  normalise_min_max <- function(x) {
     return((x - min(x, na.rm = TRUE)) / (max(x, na.rm = TRUE) - min(x, na.rm = TRUE)))
   }
   
@@ -193,6 +193,11 @@ for (obs_data_path in glacier_folders) {
     
     # Extract year from the date and add a separate column
     agg_data$year <- as.numeric(format(agg_data$date, "%Y"))
+    
+    # NEW CONDITION: skip 2021 for glaciers 44, 146, and 238
+    if (glacier_num %in% c(44, 146, 238)) {
+      agg_data <- subset(agg_data, year != 2021)
+    }
     
     # Get the file number from the file name
     # Extracting the last number from the filename using a corrected regex
@@ -696,7 +701,7 @@ for (obs_data_path in glacier_folders) {
       # Check if the dataset has enough data points for spline fitting
       if (!is.null(dataset) && nrow(dataset) > 3) {
         # Fit a smooth spline to anomaly values with degrees of freedom (df) set to 15
-        fit <- smooth.spline(dataset$date, dataset$anomaly, df = 50)
+        fit <- smooth.spline(dataset$date, dataset$anomaly, df = 1000)
         
         # Calculate residuals, sigma, and confidence intervals
         res <- (fit$yin - fit$y) / (1 - fit$lev)  # Calculate residuals
@@ -1171,7 +1176,7 @@ for (obs_data_path in glacier_folders) {
   # Global labels
   mtext("year of study", side = 2, line = 4, outer = TRUE, cex = 1.3)
   mtext("elevation band", side = 1, line = 4.5, outer = TRUE, cex = 1.3)
-  mtext(paste0(folder_name, " - ", glacier_name), side = 3, line = 0.5, outer = TRUE, cex = 1.5)
+  mtext(paste0("Glacier ", glacier_num + 1, " Flowline ", flowline_num, " - ", glacier_name), side = 3, line = 0.5, outer = TRUE, cex = 1.5)
   
   
   # Close the PDF device
@@ -1387,7 +1392,7 @@ for (obs_data_path in glacier_folders) {
   # Global labels
   mtext("year of study", side = 2, line = 4, outer = TRUE, cex = 1.3)
   mtext("elevation band", side = 1, line = 4.5, outer = TRUE, cex = 1.3)
-  mtext(paste0(folder_name, " - ", glacier_name), side = 3, line = 0.5, outer = TRUE, cex = 1.5)
+  mtext(paste0("Glacier ", glacier_num + 1, " Flowline ", flowline_num, " - ", glacier_name), side = 3, line = 0.5, outer = TRUE, cex = 1.5)
   
   
   # Close the PDF device
@@ -1620,7 +1625,7 @@ for (obs_data_path in glacier_folders) {
   # Global labels
   mtext("year of study", side = 2, line = 4, outer = TRUE, cex = 1.3)
   mtext("elevation band", side = 1, line = 4.5, outer = TRUE, cex = 1.3)
-  mtext(paste0(folder_name, " - ", glacier_name), side = 3, line = 0.5, outer = TRUE, cex = 1.5)
+  mtext(paste0("Glacier ", glacier_num + 1, " Flowline ", flowline_num, " - ", glacier_name), side = 3, line = 0.5, outer = TRUE, cex = 1.5)
   
   # Close the PDF device
   dev.off()
@@ -1632,70 +1637,142 @@ for (obs_data_path in glacier_folders) {
   ##### 8d. RATIO HEATMAP #####
   
   # Define file path for the PDF
-  pdf_file_path <- file.path("/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Heatmaps/Regular",
-                             paste0("gl_", glacier_num, "_", flowline_num, "_hm_fric1.pdf"))
+  pdf_file_path <- file.path(
+    "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Heatmaps/Regular",
+    paste0("gl_", glacier_num, "_", flowline_num, "_hm_fric1.pdf")
+  )
   
   # Open PDF device
-  pdf(pdf_file_path, width = 11.5, height = 4)  # Increased width for legend space
-  par(mar = c(0.2, 0.2, 0.2, 0.75), oma = c(4.5, 4, 1.5, 0.75))  # Adjusted margin for legend
+  pdf(pdf_file_path, width = 11.5, height = 4)
+  par(mar = c(0.2, 0.2, 0.2, 0.75), oma = c(4.5, 4, 1.5, 0.75))
   
-  # Convert to log scale for better visualization, avoiding -Inf
-  log_ratios <- log10(pmax(ratio_matrix, 10^-1))  # Clip small values at 10^-1
+  # Convert to log scale for visualization (clip small values)
+  log_ratios <- log10(pmax(ratio_matrix, 10^-1))
   
-  # Define colors (blue for frontal-dominated, red for basal-dominated)
-  breaks <- seq(-1, 1, length.out = 1000)  # Log scale
+  # Define colors
+  breaks <- seq(-1, 1, length.out = 1000)
   color_palette <- colorRampPalette(c("#364B9A", "#EAECCC", "#A50026"))(999)
   
-  # Reverse year order for plotting (2016 at top, 2021 at bottom)
+  # Reverse year order for plotting
   rev_years <- rev(years)
-  log_ratios_reordered <- log_ratios[rev(seq_len(nrow(log_ratios))), ]  # Reverse row order
+  log_ratios_reordered <- log_ratios[rev(seq_len(nrow(log_ratios))), ]
   
-  # Set up plotting region with extra space for legend
-  layout(matrix(c(1,2), nrow = 1), widths = c(5.8, 0.5))  # Main plot (4), legend (0.5)
+  # ALSO reorder original ratios for text labels
+  ratio_vals_reordered <- ratio_matrix[rev(seq_len(nrow(ratio_matrix))), ]
+  ratio_labels <- round(ratio_vals_reordered, 2)
   
-  # Plot heatmap with corrected order
-  image(1:length(elevations), 1:length(rev_years), t(log_ratios_reordered),
-        col = color_palette, breaks = breaks, axes = FALSE,
-        xlab = "", ylab = "")
+  # Layout: heatmap + legend
+  layout(matrix(c(1, 2), nrow = 1), widths = c(5.8, 0.5))
   
-  # Draw a black border around the entire heatmap
-  rect(xleft = 0.5, xright = length(elevations) + 0.5,
-       ybottom = 0.5, ytop = length(rev_years) + 0.5, 
-       border = "black", lwd = 2)  # Adjust thickness as needed
+  # --- MAIN HEATMAP ---
+  image(
+    1:length(elevations),
+    1:length(rev_years),
+    t(log_ratios_reordered),
+    col = color_palette,
+    breaks = breaks,
+    axes = FALSE,
+    xlab = "", ylab = ""
+  )
   
-  # Add axis labels with only tick marks (no long lines)
-  axis(1, at = 1:length(elevations), labels = paste0(elevations, "m"), las = 2, tck = -0.04, lwd = 0, lwd.ticks = 1, cex.axis = 1)
-  axis(2, at = 1:length(rev_years), labels = rev_years, las = 1, tck = -0.04, lwd = 0, lwd.ticks = 1, cex.axis = 1)
+  # Draw border
+  rect(
+    xleft = 0.5, xright = length(elevations) + 0.5,
+    ybottom = 0.5, ytop = length(rev_years) + 0.5,
+    border = "black", lwd = 2
+  )
   
-  #Global labels
+  # Axes
+  axis(
+    1, at = 1:length(elevations),
+    labels = paste0(elevations),
+    las = 2, tck = -0.04, lwd = 0, lwd.ticks = 1, cex.axis = 1
+  )
+  axis(
+    2, at = 1:length(rev_years),
+    labels = rev_years,
+    las = 1, tck = -0.04, lwd = 0, lwd.ticks = 1, cex.axis = 1
+  )
+  
+  # Global labels
   mtext("year of study", side = 2, line = 3, outer = TRUE, cex = 1.1)
-  mtext("elevation band", side = 1, line = 3.5, outer = TRUE, cex = 1.1)
-  mtext(paste0(folder_name, " - ", glacier_name), side = 3, line = 0, outer = TRUE, cex = 1.3)
+  mtext("elevation [m a.s.l.]", side = 1, line = 3, outer = TRUE, cex = 1.1)
+  mtext(
+    paste0("Glacier ", glacier_num + 1, " Flowline ", flowline_num, " - ", glacier_name),
+    side = 3, line = 0, outer = TRUE, cex = 1.3
+  )
   
-  ### ADDING COLOR LEGEND ###
-  par(mar = c(0.2, 0, 0.2, 2.75))  # Adjust margin for legend panel
-  image(1, seq(-1, 1, length.out = 1000), matrix(seq(-1, 1, length.out = 1000), nrow = 1),
-        col = color_palette, breaks = breaks, axes = FALSE, xlab = "", ylab = "")
   
-  # Define log-scale labels and positions
-  log_ticks <- seq(-1, 1, by = 1)  # Positions in log10 space
-  log_labels <- parse(text = paste0("10^", log_ticks))  # Log-scale labels
+  # Helper to choose black/white text for readability
+  get_text_col <- function(bg_col) {
+    rgb <- col2rgb(bg_col)
+    brightness <- 0.299 * rgb[1] + 0.587 * rgb[2] + 0.114 * rgb[3]
+    ifelse(brightness < 140, "white", "black")
+  }
   
-  # Add log-scale ticks and labels
+  # Map each pixel to its background color
+  color_index <- findInterval(
+    t(log_ratios_reordered),
+    breaks,
+    all.inside = TRUE
+  )
+  
+  # FIX: reshape colors into matrix matching image layout
+  pixel_cols <- matrix(
+    color_palette[color_index],
+    nrow = ncol(log_ratios_reordered),
+    ncol = nrow(log_ratios_reordered)
+  )
+  
+  # Draw numeric labels
+  for (i in seq_len(nrow(ratio_labels))) {
+    for (j in seq_len(ncol(ratio_labels))) {
+      
+      val <- ratio_labels[i, j]
+      if (is.na(val)) next
+      
+      txt_col <- get_text_col(pixel_cols[j, i])
+      
+      text(
+        x = j,
+        y = i,
+        labels = sprintf("%.2f", val),
+        cex = 0.55,
+        col = txt_col
+      )
+    }
+  }
+  
+  ### --- COLOR LEGEND ---
+  par(mar = c(0.2, 0, 0.2, 2.75))
+  
+  image(
+    1,
+    seq(-1, 1, length.out = 1000),
+    matrix(seq(-1, 1, length.out = 1000), nrow = 1),
+    col = color_palette,
+    breaks = breaks,
+    axes = FALSE,
+    xlab = "", ylab = ""
+  )
+  
+  log_ticks  <- seq(-1, 1, by = 1)
+  log_labels <- parse(text = paste0("10^", log_ticks))
+  
   axis(4, at = log_ticks, labels = log_labels, las = 1, cex.axis = 0.8, line = 0.1)
-  mtext("velocity driver", side = 4, line = 2.25, cex = 0.8)
+  mtext("similarity index, S", side = 4, line = 2.25, cex = 0.8)
   mtext("basal                                       frontal", side = 4, line = -1.3, cex = 0.8)
   
-  # Draw a black border around the legend
-  rect(xleft = 0.6, xright = 1.4, ybottom = min(log_ticks), ytop = max(log_ticks),
-       border = "black", lwd = 2)  # Adjust thickness as needed
+  rect(
+    xleft = 0.6, xright = 1.4,
+    ybottom = min(log_ticks), ytop = max(log_ticks),
+    border = "black", lwd = 2
+  )
   
   # Close PDF device
   dev.off()
   
-  # Notify of the output location
   cat("Heatmap saved as PDF at:", pdf_file_path, "\n")
-  
   
   ##### 8e. RATIO BINARY HEATMAP #####
   
@@ -1738,7 +1815,7 @@ for (obs_data_path in glacier_folders) {
   #Global labels
   mtext("year of study", side = 2, line = 3, outer = TRUE, cex = 1.1)
   mtext("elevation band", side = 1, line = 3.5, outer = TRUE, cex = 1.1)
-  mtext(paste0(folder_name, " - ", glacier_name), side = 3, line = 0, outer = TRUE, cex = 1.3)
+  mtext(paste0("Glacier ", glacier_num + 1, " Flowline ", flowline_num, " - ", glacier_name), side = 3, line = 0, outer = TRUE, cex = 1.3)
   
   ### ADDING COLOR LEGEND ###
   par(mar = c(0.2, 0, 0.2, 2.75))  # Adjust margin for legend panel
@@ -2036,7 +2113,7 @@ for (obs_data_path in glacier_folders) {
   
   mtext("year of study", side = 2, line = 3, outer = TRUE, cex = 1.1)
   mtext("elevation band", side = 1, line = 3.5, outer = TRUE, cex = 1.1)
-  mtext(paste0(folder_name, " - ", glacier_name), side = 3, line = 0, outer = TRUE, cex = 1.3)
+  mtext(paste0("Glacier ", glacier_num + 1, " Flowline ", flowline_num, " - ", glacier_name), side = 3, line = 0, outer = TRUE, cex = 1.3)
   
   par(mar = c(0.2, 0, 0.2, 2.75))
   legend_vals <- matrix(seq(-M, M, length.out = 1000), nrow = 1)
@@ -2132,7 +2209,7 @@ for (obs_data_path in glacier_folders) {
   
   mtext("year of study", side = 2, line = 3,  outer = TRUE, cex = 1.1)
   mtext("elevation band", side = 1, line = 3.5, outer = TRUE, cex = 1.1)
-  mtext(paste0(folder_name, " - ", glacier_name), side = 3, line = 0, outer = TRUE, cex = 1.3)
+  mtext(paste0("Glacier ", glacier_num + 1, " Flowline ", flowline_num, " - ", glacier_name), side = 3, line = 0, outer = TRUE, cex = 1.3)
   
   par(mar = c(0.2, 0, 0.2, 2.75))
   legend_vals <- matrix(seq(-M, M, length.out = 1000), nrow = 1)
@@ -2229,7 +2306,7 @@ for (obs_data_path in glacier_folders) {
   
   mtext("year of study", side = 2, line = 3,  outer = TRUE, cex = 1.1)
   mtext("elevation band", side = 1, line = 3.5, outer = TRUE, cex = 1.1)
-  mtext(paste0(folder_name, " - ", glacier_name), side = 3, line = 0, outer = TRUE, cex = 1.3)
+  mtext(paste0("Glacier ", glacier_num + 1, " Flowline ", flowline_num, " - ", glacier_name), side = 3, line = 0, outer = TRUE, cex = 1.3)
   
   par(mar = c(0.2, 0, 0.2, 2.75))
   legend_vals <- matrix(seq(-M, M, length.out = 1000), nrow = 1)
@@ -2309,7 +2386,7 @@ for (obs_data_path in glacier_folders) {
   
   mtext("year of study", side = 2, line = 3, outer = TRUE, cex = 1.1)
   mtext("elevation band", side = 1, line = 3.5, outer = TRUE, cex = 1.1)
-  mtext(paste0(folder_name, " - ", glacier_name), side = 3, line = 0, outer = TRUE, cex = 1.3)
+  mtext(paste0("Glacier ", glacier_num + 1, " Flowline ", flowline_num, " - ", glacier_name), side = 3, line = 0, outer = TRUE, cex = 1.3)
   
   par(mar = c(0.2, 0, 0.2, 2.75))
   legend_vals <- matrix(seq(-M, M, length.out = 1000), nrow = 1)
@@ -2394,7 +2471,7 @@ for (obs_data_path in glacier_folders) {
   
   mtext("year of study", side = 2, line = 3, outer = TRUE, cex = 1.1)
   mtext("elevation band", side = 1, line = 3.5, outer = TRUE, cex = 1.1)
-  mtext(paste0(folder_name, " - ", glacier_name), side = 3, line = 0, outer = TRUE, cex = 1.3)
+  mtext(paste0("Glacier ", glacier_num + 1, " Flowline ", flowline_num, " - ", glacier_name), side = 3, line = 0, outer = TRUE, cex = 1.3)
   
   par(mar = c(0.2, 0, 0.2, 2.75))
   legend_vals <- matrix(seq(-M, M, length.out = 1000), nrow = 1)
@@ -2483,7 +2560,7 @@ for (obs_data_path in glacier_folders) {
   # Labels
   mtext("year of study", side = 2, line = 3, outer = TRUE, cex = 1.1)
   mtext("elevation band", side = 1, line = 3.5, outer = TRUE, cex = 1.1)
-  mtext(paste0(folder_name, " - ", glacier_name), side = 3, line = 0, outer = TRUE, cex = 1.3)
+  mtext(paste0("Glacier ", glacier_num + 1, " Flowline ", flowline_num, " - ", glacier_name), side = 3, line = 0, outer = TRUE, cex = 1.3)
   
   # Legend
   par(mar = c(0.2, 0, 0.2, 2.75))
@@ -2497,7 +2574,16 @@ for (obs_data_path in glacier_folders) {
   
   dev.off()
   cat("Heatmap saved at:", pdf_file_path, "\n")
-  ##### 8m. SUMMER PEAK DATES (OBS/MODEL/RES) + TIMING DIFF & HEATMAP #####
+
+  
+  
+  ##### 8m. SUMMER PEAK DATES (OBS/MODEL/RES) + TIMING DIFF & HEATMAP (REUSE §5 SPLINES, DAILY) #####
+  
+  # Assumes these already exist from earlier sections:
+  # - years, elevations
+  # - data_with_anomalies_obs, data_with_anomalies_model, residuals_data
+  # - spline_fits_obs, spline_fits_model, spline_fits_residuals  (from Section 5)
+  # - glacier_num, flowline_num, glacier_name
   
   # Use existing ranges if defined; otherwise define
   if (!exists("years"))      years <- 2016:2021
@@ -2516,24 +2602,55 @@ for (obs_data_path in glacier_folders) {
            ncol = length(elevations),
            dimnames = list(as.character(years), as.character(elevations)))
   }
-  .summer_mask <- function(d, yr) {
-    if (is.null(d)) return(rep(FALSE, 0))
-    d >= as.Date(paste0(yr, "-05-01")) & d <= as.Date(paste0(yr, "-09-30"))
-  }
-  .max_date <- function(dates, values) {
-    # Return the date (YYYY-MM-DD) of the first maximum value (NA if none)
-    if (is.null(dates) || is.null(values)) return(NA_character_)
-    if (length(dates) == 0 || length(values) == 0) return(NA_character_)
-    if (all(is.na(values))) return(NA_character_)
-    idx <- which(values == max(values, na.rm = TRUE))[1]
-    if (is.na(idx) || length(idx) == 0) return(NA_character_)
-    format(as.Date(dates[idx]), "%Y-%m-%d")
+  
+  # Safe approx to daily grid within overlap of [d0,d1] and spline-supported dates
+  # Returns list(date = Date, y = numeric) or NULL
+  .eval_spline_results_daily <- function(fit_results, y_col, d0, d1) {
+    if (is.null(fit_results) || nrow(fit_results) < 4) return(NULL)
+    if (!all(c("date", y_col) %in% names(fit_results))) return(NULL)
+    
+    dd <- as.Date(fit_results$date)
+    yy <- as.numeric(fit_results[[y_col]])
+    ok <- !is.na(dd) & is.finite(yy)
+    dd <- dd[ok]; yy <- yy[ok]
+    if (length(dd) < 4) return(NULL)
+    
+    ord <- order(dd)
+    dd <- dd[ord]; yy <- yy[ord]
+    keep <- !duplicated(dd)
+    dd <- dd[keep]; yy <- yy[keep]
+    if (length(dd) < 4) return(NULL)
+    
+    # clamp to spline support
+    d0c <- max(as.Date(d0), min(dd))
+    d1c <- min(as.Date(d1), max(dd))
+    if (!is.finite(d0c) || !is.finite(d1c) || d0c > d1c) return(NULL)
+    
+    grid_d <- seq(d0c, d1c, by = "day")
+    x <- as.numeric(dd)
+    gx <- as.numeric(grid_d)
+    
+    pred <- approx(x = x, y = yy, xout = gx, method = "linear", rule = 1, ties = "ordered")$y
+    if (length(pred) == 0 || all(!is.finite(pred))) return(NULL)
+    
+    list(date = grid_d, y = pred)
   }
   
-  # Allocate output matrices
-  max_date_obs_mat <- .new_mat_chr()  # summer max date of obs vel
-  max_date_mod_mat <- .new_mat_chr()  # summer max date of model vel
-  max_date_res_mat <- .new_mat_chr()  # summer max date of residual
+  # Return YYYY-MM-DD date of maximum on daily grid; NA if none
+  .max_date_from_fit_results <- function(fit_results, y_col, yr, start_mmdd = "05-01", end_mmdd = "09-30") {
+    d0 <- as.Date(paste0(yr, "-", start_mmdd))
+    d1 <- as.Date(paste0(yr, "-", end_mmdd))
+    ev <- .eval_spline_results_daily(fit_results, y_col, d0, d1)
+    if (is.null(ev)) return(NA_character_)
+    idx <- which(ev$y == max(ev$y, na.rm = TRUE))[1]
+    if (is.na(idx) || length(idx) == 0) return(NA_character_)
+    format(ev$date[idx], "%Y-%m-%d")
+  }
+  
+  # Allocate output matrices (SUMMER)
+  max_date_obs_mat     <- .new_mat_chr()  # summer max date of obs vel (from §5 spline, daily interp)
+  max_date_mod_mat     <- .new_mat_chr()  # summer max date of model vel (from §5 spline, daily interp)
+  max_date_res_mat     <- .new_mat_chr()  # summer max date of residual (from §5 spline, daily interp)
   timing_diff_days_mat <- .new_mat_num()  # obs_peak_date - res_peak_date in days
   
   # Compute per year × elevation
@@ -2541,39 +2658,34 @@ for (obs_data_path in glacier_folders) {
     for (elev in elevations) {
       key <- paste0("year", yr, "_", elev)
       
-      # Fetch subsets (if present)
-      obs    <- if (exists("data_with_anomalies_obs"))    data_with_anomalies_obs[[key]]    else NULL
-      model  <- if (exists("data_with_anomalies_model"))  data_with_anomalies_model[[key]]  else NULL
-      resdat <- if (exists("residuals_data"))             residuals_data[[key]]             else NULL
-      
-      # OBS: summer mask and max vel date
-      if (!is.null(obs) && nrow(obs) > 0) {
-        ms <- .summer_mask(obs$date, yr)
-        if (any(ms, na.rm = TRUE)) {
-          max_date_obs_mat[as.character(yr), as.character(elev)] <-
-            .max_date(obs$date[ms], obs$vel[ms])
-        }
+      # OBS peak date (May 1 – Sep 30)
+      if (exists("spline_fits_obs") && !is.null(spline_fits_obs[[key]])) {
+        max_date_obs_mat[as.character(yr), as.character(elev)] <-
+          .max_date_from_fit_results(spline_fits_obs[[key]], y_col = "fitted_anomaly",
+                                     yr = yr, start_mmdd = "05-01", end_mmdd = "09-30")
       }
       
-      # MODEL: summer mask and max vel date
-      if (!is.null(model) && nrow(model) > 0) {
-        ms <- .summer_mask(model$date, yr)
-        if (any(ms, na.rm = TRUE)) {
-          max_date_mod_mat[as.character(yr), as.character(elev)] <-
-            .max_date(model$date[ms], model$vel[ms])
-        }
+      # MODEL peak date (May 1 – Sep 30)
+      if (exists("spline_fits_model") && !is.null(spline_fits_model[[key]])) {
+        max_date_mod_mat[as.character(yr), as.character(elev)] <-
+          .max_date_from_fit_results(spline_fits_model[[key]], y_col = "fitted_anomaly",
+                                     yr = yr, start_mmdd = "05-01", end_mmdd = "09-30")
       }
       
-      # RESIDUAL: summer mask and max residual date
-      if (!is.null(resdat) && nrow(resdat) > 0) {
-        ms <- .summer_mask(resdat$date, yr)
-        if (any(ms, na.rm = TRUE)) {
-          max_date_res_mat[as.character(yr), as.character(elev)] <-
-            .max_date(resdat$date[ms], resdat$residual[ms])
-        }
+      # RESIDUAL peak date (May 1 – Sep 30)
+      if (exists("spline_fits_residuals") && !is.null(spline_fits_residuals[[key]])) {
+        max_date_res_mat[as.character(yr), as.character(elev)] <-
+          .max_date_from_fit_results(spline_fits_residuals[[key]], y_col = "fitted_residual",
+                                     yr = yr, start_mmdd = "05-01", end_mmdd = "09-30")
       }
-      
-      # Timing diff (days): obs_peak_date − res_peak_date
+    }
+  }
+  
+  # --- timing diff AFTER all peak dates are final ---
+  timing_diff_days_mat[,] <- NA_real_
+  
+  for (yr in years) {
+    for (elev in elevations) {
       d_obs <- max_date_obs_mat[as.character(yr), as.character(elev)]
       d_res <- max_date_res_mat[as.character(yr), as.character(elev)]
       if (!is.na(d_obs) && !is.na(d_res)) {
@@ -2583,7 +2695,7 @@ for (obs_data_path in glacier_folders) {
     }
   }
   
-  # Save CSVs
+  # ---- Save CSVs (SUMMER) ----
   base_dir <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Max Velocities"
   p_csv_obs    <- file.path(base_dir, "CSV/Obs")
   p_csv_mod    <- file.path(base_dir, "CSV/Mod")
@@ -2604,18 +2716,17 @@ for (obs_data_path in glacier_folders) {
             file.path(p_csv_timing, paste0("gl_", glacier_num, "_", flowline_num, "_max_s_vel_obs-res_timing_fric1.csv")),
             row.names = TRUE)
   
-  cat("Saved summer peak date CSVs and timing diff CSVs in:", base_dir, "\n")
+  cat("Saved SUMMER peak-date CSVs (from §5 splines) and timing diff CSVs in:", base_dir, "\n")
   
-  # Heatmap of timing differences (days): symmetric ± max|diff|
+  # ---- Heatmap of timing differences (days): symmetric ± max|diff| ----
   p_graph_timing <- file.path(base_dir, "Graphs/Timing")
   if (!dir.exists(p_graph_timing)) dir.create(p_graph_timing, recursive = TRUE)
   pdf_file_path <- file.path(p_graph_timing,
                              paste0("gl_", glacier_num, "_", flowline_num, "_max_s_vel_obs-res_timing_fric1.pdf"))
   
-  # Prepare data for plotting
-  years_vec <- rownames(timing_diff_days_mat)
-  elevs_vec <- as.numeric(colnames(timing_diff_days_mat))
-  rev_years <- rev(years_vec)
+  years_vec   <- rownames(timing_diff_days_mat)
+  elevs_vec   <- as.numeric(colnames(timing_diff_days_mat))
+  rev_years   <- rev(years_vec)
   timing_plot <- timing_diff_days_mat[rev_years, , drop = FALSE]
   
   M <- suppressWarnings(max(abs(timing_plot), na.rm = TRUE))
@@ -2640,7 +2751,8 @@ for (obs_data_path in glacier_folders) {
   
   mtext("year of study", side = 2, line = 3, outer = TRUE, cex = 1.1)
   mtext("elevation band", side = 1, line = 3.5, outer = TRUE, cex = 1.1)
-  mtext(paste0(folder_name, " - ", glacier_name), side = 3, line = 0, outer = TRUE, cex = 1.3)
+  mtext(paste0("Glacier ", glacier_num + 1, " Flowline ", flowline_num, " - ", glacier_name),
+        side = 3, line = 0, outer = TRUE, cex = 1.3)
   
   par(mar = c(0.2, 0, 0.2, 2.75))
   legend_vals <- matrix(seq(-M, M, length.out = 1000), nrow = 1)
@@ -2648,11 +2760,226 @@ for (obs_data_path in glacier_folders) {
         col = color_palette, breaks = breaks, axes = FALSE, xlab = "", ylab = "")
   axis(4, at = pretty(c(-M, M), n = 5), labels = pretty(c(-M, M), n = 5),
        las = 1, cex.axis = 0.8, line = 0.1)
-  mtext("obs peak date − res peak date (days)", side = 4, line = 2.25, cex = 0.8)
+  mtext("obs peak date \u2212 res peak date (days)", side = 4, line = 2.25, cex = 0.8)
   rect(xleft = 0.6, xright = 1.4, ybottom = -M, ytop = M, border = "black", lwd = 2)
   
   dev.off()
   cat("Timing heatmap saved at:", pdf_file_path, "\n")
+  
+  
+  
+  ##### 8m. ANNUAL PEAK DATES (OBS/MODEL/RES) + TIMING DIFF & HEATMAP (REUSE §5 SPLINES, DAILY) #####
+  
+  # Assumes these already exist from earlier sections:
+  # - years, elevations
+  # - data_with_anomalies_obs, data_with_anomalies_model, residuals_data
+  # - spline_fits_obs, spline_fits_model, spline_fits_residuals  (from Section 5)
+  # - glacier_num, flowline_num, glacier_name
+  #
+  # NOTE: This reuses the *precomputed spline fit-results* (date + fitted anomaly/residual)
+  # and linearly interpolates them onto a daily grid within the spline-supported date range
+  # (no re-fitting smooth.spline here).
+  
+  # Use existing ranges if defined; otherwise define
+  if (!exists("years"))      years <- 2016:2021
+  if (!exists("elevations")) elevations <- seq(100, 2100, by = 100)
+  
+  # Helpers
+  .new_mat_chr <- function() {
+    matrix(NA_character_,
+           nrow = length(years),
+           ncol = length(elevations),
+           dimnames = list(as.character(years), as.character(elevations)))
+  }
+  .new_mat_num <- function() {
+    matrix(NA_real_,
+           nrow = length(years),
+           ncol = length(elevations),
+           dimnames = list(as.character(years), as.character(elevations)))
+  }
+  
+  # Safe approx to daily grid within overlap of [d0,d1] and spline-supported dates
+  # Returns list(date = Date, y = numeric) or NULL
+  .eval_spline_results_daily <- function(fit_results, y_col, d0, d1) {
+    if (is.null(fit_results) || nrow(fit_results) < 4) return(NULL)
+    if (!all(c("date", y_col) %in% names(fit_results))) return(NULL)
+    
+    dd <- as.Date(fit_results$date)
+    yy <- as.numeric(fit_results[[y_col]])
+    ok <- !is.na(dd) & is.finite(yy)
+    dd <- dd[ok]; yy <- yy[ok]
+    if (length(dd) < 4) return(NULL)
+    
+    # ensure sorted unique x for approx
+    ord <- order(dd)
+    dd <- dd[ord]; yy <- yy[ord]
+    # drop duplicate dates (keep first)
+    keep <- !duplicated(dd)
+    dd <- dd[keep]; yy <- yy[keep]
+    if (length(dd) < 4) return(NULL)
+    
+    # clamp to spline support
+    d0c <- max(as.Date(d0), min(dd))
+    d1c <- min(as.Date(d1), max(dd))
+    if (!is.finite(d0c) || !is.finite(d1c) || d0c > d1c) return(NULL)
+    
+    grid_d <- seq(d0c, d1c, by = "day")
+    # approx needs numeric x
+    x <- as.numeric(dd)
+    gx <- as.numeric(grid_d)
+    
+    pred <- approx(x = x, y = yy, xout = gx, method = "linear", rule = 1, ties = "ordered")$y
+    if (length(pred) == 0 || all(!is.finite(pred))) return(NULL)
+    
+    list(date = grid_d, y = pred)
+  }
+  
+  # Return YYYY-MM-DD date of maximum on daily grid; NA if none
+  .max_date_from_fit_results <- function(fit_results, y_col, yr, start_mmdd = "01-01", end_mmdd = "12-31") {
+    d0 <- as.Date(paste0(yr, "-", start_mmdd))
+    d1 <- as.Date(paste0(yr, "-", end_mmdd))
+    ev <- .eval_spline_results_daily(fit_results, y_col, d0, d1)
+    if (is.null(ev)) return(NA_character_)
+    idx <- which(ev$y == max(ev$y, na.rm = TRUE))[1]
+    if (is.na(idx) || length(idx) == 0) return(NA_character_)
+    format(ev$date[idx], "%Y-%m-%d")
+  }
+  
+  # Allocate output matrices (ANNUAL)
+  max_date_obs_mat     <- .new_mat_chr()  # annual max date of obs (from §5 spline, daily interp)
+  max_date_mod_mat     <- .new_mat_chr()  # annual max date of model (from §5 spline, daily interp)
+  max_date_res_mat     <- .new_mat_chr()  # annual max date of residual (from §5 spline, daily interp)
+  timing_diff_days_mat <- .new_mat_num()  # obs_peak_date - res_peak_date in days
+  
+  # Compute per year × elevation
+  for (yr in years) {
+    for (elev in elevations) {
+      key <- paste0("year", yr, "_", elev)
+      
+      # --- OBS peak date from precomputed spline fits (anomaly spline) ---
+      # Expect: spline_fits_obs[[key]] is a data.frame with columns date + fitted_anomaly
+      if (exists("spline_fits_obs") && !is.null(spline_fits_obs[[key]])) {
+        max_date_obs_mat[as.character(yr), as.character(elev)] <-
+          .max_date_from_fit_results(spline_fits_obs[[key]], y_col = "fitted_anomaly",
+                                     yr = yr, start_mmdd = "01-01", end_mmdd = "12-31")
+      }
+      
+      # --- MODEL peak date from precomputed spline fits (anomaly spline) ---
+      if (exists("spline_fits_model") && !is.null(spline_fits_model[[key]])) {
+        max_date_mod_mat[as.character(yr), as.character(elev)] <-
+          .max_date_from_fit_results(spline_fits_model[[key]], y_col = "fitted_anomaly",
+                                     yr = yr, start_mmdd = "01-01", end_mmdd = "12-31")
+      }
+      
+      # --- RESIDUAL peak date from precomputed spline fits (residual anomaly spline) ---
+      # Expect: spline_fits_residuals[[key]] is a data.frame with columns date + fitted_residual
+      if (exists("spline_fits_residuals") && !is.null(spline_fits_residuals[[key]])) {
+        max_date_res_mat[as.character(yr), as.character(elev)] <-
+          .max_date_from_fit_results(spline_fits_residuals[[key]], y_col = "fitted_residual",
+                                     yr = yr, start_mmdd = "01-01", end_mmdd = "12-31")
+      }
+    }
+  }
+  
+  # --- timing diff AFTER all peak dates are final ---
+  timing_diff_days_mat[,] <- NA_real_
+  
+  for (yr in years) {
+    for (elev in elevations) {
+      d_obs <- max_date_obs_mat[as.character(yr), as.character(elev)]
+      d_res <- max_date_res_mat[as.character(yr), as.character(elev)]
+      if (!is.na(d_obs) && !is.na(d_res)) {
+        timing_diff_days_mat[as.character(yr), as.character(elev)] <-
+          as.numeric(as.Date(d_obs) - as.Date(d_res))
+      }
+    }
+  }
+  
+  # ---- Save CSVs (ANNUAL) ----
+  base_dir <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Max Velocities/Annual"
+  p_csv_obs    <- file.path(base_dir, "CSV/Obs")
+  p_csv_mod    <- file.path(base_dir, "CSV/Mod")
+  p_csv_res    <- file.path(base_dir, "CSV/Res")
+  p_csv_timing <- file.path(base_dir, "CSV/Timing")
+  for (p in list(p_csv_obs, p_csv_mod, p_csv_res, p_csv_timing)) if (!dir.exists(p)) dir.create(p, recursive = TRUE)
+  
+  write.csv(max_date_obs_mat,
+            file.path(p_csv_obs, paste0("gl_", glacier_num, "_", flowline_num, "_max_a_vel_obs_fric1.csv")),
+            row.names = TRUE)
+  write.csv(max_date_mod_mat,
+            file.path(p_csv_mod, paste0("gl_", glacier_num, "_", flowline_num, "_max_a_vel_model_fric1.csv")),
+            row.names = TRUE)
+  write.csv(max_date_res_mat,
+            file.path(p_csv_res, paste0("gl_", glacier_num, "_", flowline_num, "_max_a_vel_res_fric1.csv")),
+            row.names = TRUE)
+  write.csv(timing_diff_days_mat,
+            file.path(p_csv_timing, paste0("gl_", glacier_num, "_", flowline_num, "_max_a_vel_obs-res_timing_fric1.csv")),
+            row.names = TRUE)
+  
+  cat("Saved ANNUAL peak-date CSVs (from §5 splines) and timing diff CSVs in:", base_dir, "\n")
+  
+  yr_test   <- 2016
+  elev_test <- 400
+  
+  cat("OBS peak:", max_date_obs_mat[as.character(yr_test), as.character(elev_test)], "\n")
+  cat("RES peak:", max_date_res_mat[as.character(yr_test), as.character(elev_test)], "\n")
+  cat("DIFF:", timing_diff_days_mat[as.character(yr_test), as.character(elev_test)], "\n")
+  cat("Manual:",
+      as.numeric(as.Date(max_date_obs_mat[as.character(yr_test), as.character(elev_test)]) -
+                   as.Date(max_date_res_mat[as.character(yr_test), as.character(elev_test)])),
+      "\n")
+  
+  # ---- Heatmap of timing differences (days): symmetric ± max|diff| ----
+  p_graph_timing <- file.path(base_dir, "Graphs/Timing")
+  if (!dir.exists(p_graph_timing)) dir.create(p_graph_timing, recursive = TRUE)
+  pdf_file_path <- file.path(p_graph_timing,
+                             paste0("gl_", glacier_num, "_", flowline_num, "_max_a_vel_obs-res_timing_fric1.pdf"))
+  
+  # Prepare data for plotting
+  years_vec   <- rownames(timing_diff_days_mat)
+  elevs_vec   <- as.numeric(colnames(timing_diff_days_mat))
+  rev_years   <- rev(years_vec)
+  timing_plot <- timing_diff_days_mat[rev_years, , drop = FALSE]
+  
+  M <- suppressWarnings(max(abs(timing_plot), na.rm = TRUE))
+  if (!is.finite(M) || M == 0) M <- 1
+  breaks <- seq(-M, M, length.out = 1000)
+  color_palette <- colorRampPalette(c("#364B9A", "#EAECCC", "#A50026"))(length(breaks) - 1)
+  
+  pdf(pdf_file_path, width = 11.5, height = 4)
+  par(mar = c(0.2, 0.2, 0.2, 0.75), oma = c(4.5, 4, 1.5, 0.75))
+  layout(matrix(c(1,2), nrow = 1), widths = c(5.8, 0.5))
+  
+  image(1:length(elevs_vec), 1:length(rev_years), t(timing_plot),
+        col = color_palette, breaks = breaks, axes = FALSE, xlab = "", ylab = "")
+  rect(xleft = 0.5, xright = length(elevs_vec) + 0.5,
+       ybottom = 0.5, ytop = length(rev_years) + 0.5,
+       border = "black", lwd = 2)
+  
+  axis(1, at = 1:length(elevs_vec), labels = paste0(elevs_vec, "m"),
+       las = 2, tck = -0.04, lwd = 0, lwd.ticks = 1, cex.axis = 1)
+  axis(2, at = 1:length(rev_years), labels = rev_years,
+       las = 1, tck = -0.04, lwd = 0, lwd.ticks = 1, cex.axis = 1)
+  
+  mtext("year of study", side = 2, line = 3, outer = TRUE, cex = 1.1)
+  mtext("elevation band", side = 1, line = 3.5, outer = TRUE, cex = 1.1)
+  mtext(paste0("Glacier ", glacier_num + 1, " Flowline ", flowline_num, " - ", glacier_name),
+        side = 3, line = 0, outer = TRUE, cex = 1.3)
+  
+  par(mar = c(0.2, 0, 0.2, 2.75))
+  legend_vals <- matrix(seq(-M, M, length.out = 1000), nrow = 1)
+  image(1, seq(-M, M, length.out = 1000), legend_vals,
+        col = color_palette, breaks = breaks, axes = FALSE, xlab = "", ylab = "")
+  axis(4, at = pretty(c(-M, M), n = 5), labels = pretty(c(-M, M), n = 5),
+       las = 1, cex.axis = 0.8, line = 0.1)
+  mtext("obs peak date \u2212 res peak date (days)", side = 4, line = 2.25, cex = 0.8)
+  rect(xleft = 0.6, xright = 1.4, ybottom = -M, ytop = M, border = "black", lwd = 2)
+  
+  dev.off()
+  cat("Timing heatmap saved at:", pdf_file_path, "\n")
+  
+  
+  
   ##### 8n. SUMMARY (UPDATED): overall, per-elevation, and per-year means of timing diffs #####
   
   # Helpers
@@ -2758,5 +3085,245 @@ for (obs_data_path in glacier_folders) {
   }
   
   cat("Saved/updated timing summary (overall, per-elevation, per-year) in:", summary_file, "\n")
+  ##### 8o. MINIMUM OBSERVED VELOCITIES & DATES (from SPLINES) + HEATMAP #####
+  
+  # Assumes: years, elevations, data_with_anomalies_obs, glacier_num, flowline_num, glacier_name exist
+  
+  # Helpers
+  .new_mat_chr <- function() {
+    matrix(NA_character_,
+           nrow = length(years),
+           ncol = length(elevations),
+           dimnames = list(as.character(years), as.character(elevations)))
+  }
+  .new_mat_num <- function() {
+    matrix(NA_real_,
+           nrow = length(years),
+           ncol = length(elevations),
+           dimnames = list(as.character(years), as.character(elevations)))
+  }
+  .summer_mask_dates <- function(dates, yr) {
+    if (is.null(dates)) return(rep(FALSE, 0))
+    dates >= as.Date(paste0(yr, "-05-01")) & dates <= as.Date(paste0(yr, "-09-30"))
+  }
+  .safe_wmean <- function(x, w) {
+    if (is.null(x)) return(NA_real_)
+    if (is.null(w)) return(mean(x, na.rm = TRUE))
+    mask <- is.finite(x) & is.finite(w)
+    if (!any(mask)) return(NA_real_)
+    weighted.mean(x[mask], w[mask], na.rm = TRUE)
+  }
+  
+  # Evaluate spline daily over [d0, d1] and return (min_anom, min_date)
+  .spline_min_in_window <- function(dates, anom, d0, d1, df = 20, spar = 0.7) {
+    x <- as.numeric(dates)
+    y <- as.numeric(anom)
+    mask <- is.finite(x) & is.finite(y)
+    if (sum(mask) < 4) return(list(min_anom = NA_real_, min_date = NA_character_))
+    fit <- try(smooth.spline(x[mask], y[mask], df = df, spar = spar), silent = TRUE)
+    if (inherits(fit, "try-error")) return(list(min_anom = NA_real_, min_date = NA_character_))
+    grid <- seq(d0, d1, by = "day")
+    pred <- try(predict(fit, as.numeric(grid))$y, silent = TRUE)
+    if (inherits(pred, "try-error") || all(!is.finite(pred))) return(list(min_anom = NA_real_, min_date = NA_character_))
+    k <- which.min(pred)
+    list(min_anom = pred[k], min_date = format(grid[k], "%Y-%m-%d"))
+  }
+  
+  # Allocate outputs
+  obs_a_vel_min_mat   <- .new_mat_num()  # (1) annual min observed velocities (from spline)
+  obs_a_vel_min_d_mat <- .new_mat_chr()  # (2) dates of annual min observed velocities
+  obs_s_vel_min_mat   <- .new_mat_num()  # (3) summer min observed velocities (from spline)
+  obs_s_vel_min_d_mat <- .new_mat_chr()  # (4) dates of summer min observed velocities
+  
+  # Compute per year × elevation using SPLINES
+  for (yr in years) {
+    for (elev in elevations) {
+      key <- paste0("year", yr, "_", elev)
+      obs <- if (exists("data_with_anomalies_obs")) data_with_anomalies_obs[[key]] else NULL
+      if (is.null(obs) || nrow(obs) == 0) next
+      if (!all(c("date","vel","anomaly") %in% names(obs))) next
+      
+      d <- as.Date(obs$date)
+      # Weighted mean of observed velocity (same weights as used to build anomalies)
+      wmean_vel <- .safe_wmean(obs$vel, obs$weight)
+      
+      # Annual window
+      d0_a <- as.Date(paste0(yr, "-01-01"))
+      d1_a <- as.Date(paste0(yr, "-12-31"))
+      res_a <- .spline_min_in_window(d, obs$anomaly, d0_a, d1_a, df = 20, spar = 0.7)
+      if (is.finite(res_a$min_anom)) {
+        obs_a_vel_min_mat[as.character(yr), as.character(elev)]   <- wmean_vel + res_a$min_anom
+        obs_a_vel_min_d_mat[as.character(yr), as.character(elev)] <- res_a$min_date
+      }
+      
+      # Summer window (May 1 – Sep 30)
+      d0_s <- as.Date(paste0(yr, "-05-01"))
+      d1_s <- as.Date(paste0(yr, "-09-30"))
+      res_s <- .spline_min_in_window(d, obs$anomaly, d0_s, d1_s, df = 20, spar = 0.7)
+      if (is.finite(res_s$min_anom)) {
+        obs_s_vel_min_mat[as.character(yr), as.character(elev)]   <- wmean_vel + res_s$min_anom
+        obs_s_vel_min_d_mat[as.character(yr), as.character(elev)] <- res_s$min_date
+      }
+    }
+  }
+  
+  # ---- Save CSVs ----
+  base_dir <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Outputs/fric1/Min Velocities"
+  mk <- function(p) if (!dir.exists(p)) dir.create(p, recursive = TRUE)
+  
+  p_a_min   <- file.path(base_dir, "Obs/CSV/Annual Min");        mk(p_a_min)
+  p_a_min_d <- file.path(base_dir, "Obs/CSV/Annual Min Date");   mk(p_a_min_d)
+  p_s_min   <- file.path(base_dir, "Obs/CSV/Summer Min");        mk(p_s_min)
+  p_s_min_d <- file.path(base_dir, "Obs/CSV/Summer Min Date");   mk(p_s_min_d)
+  
+  write.csv(obs_a_vel_min_mat,
+            file.path(p_a_min,   paste0("gl_", glacier_num, "_", flowline_num, "_a_vel_min_fric1.csv")),
+            row.names = TRUE)
+  write.csv(obs_a_vel_min_d_mat,
+            file.path(p_a_min_d, paste0("gl_", glacier_num, "_", flowline_num, "_a_vel_min_d_fric1.csv")),
+            row.names = TRUE)
+  write.csv(obs_s_vel_min_mat,
+            file.path(p_s_min,   paste0("gl_", glacier_num, "_", flowline_num, "_s_vel_min_fric1.csv")),
+            row.names = TRUE)
+  write.csv(obs_s_vel_min_d_mat,
+            file.path(p_s_min_d, paste0("gl_", glacier_num, "_", flowline_num, "_s_vel_min_d_fric1.csv")),
+            row.names = TRUE)
+  
+  cat("Saved SPLINE-BASED minimum velocity matrices (annual/summer, values/dates) to:", base_dir, "\n")
+  
+  # ---- Heatmap of ANNUAL MIN DATES (rainbow/hsv; month ticks) ----
+  # Convert date matrix to day-of-year (DOY)
+  a_min_doy_mat <- matrix(NA_real_,
+                          nrow = nrow(obs_a_vel_min_d_mat),
+                          ncol = ncol(obs_a_vel_min_d_mat),
+                          dimnames = dimnames(obs_a_vel_min_d_mat))
+  for (i in seq_len(nrow(obs_a_vel_min_d_mat))) {
+    for (j in seq_len(ncol(obs_a_vel_min_d_mat))) {
+      dstr <- obs_a_vel_min_d_mat[i, j]
+      if (!is.na(dstr) && nzchar(dstr)) {
+        dd <- as.Date(dstr)
+        if (!is.na(dd)) {
+          doy <- as.numeric(format(dd, "%j"))
+          if (is.finite(doy)) a_min_doy_mat[i, j] <- min(max(doy, 1), 366)
+        }
+      }
+    }
+  }
+  
+  # Plot order and scale
+  years_vec <- rownames(a_min_doy_mat)
+  elevs_vec <- as.numeric(colnames(a_min_doy_mat))
+  rev_years <- rev(years_vec)
+  plot_mat  <- a_min_doy_mat[rev_years, , drop = FALSE]
+  
+  dmin <- 1; dmax <- 366
+  breaks <- seq(dmin, dmax, length.out = 367)               # 366 bins
+  color_palette <- rainbow(length(breaks) - 1, start = 0, end = 0.85)
+  
+  # Legend ticks: first of each month (non-leap ref year)
+  ref_year <- 2021
+  month_starts <- as.Date(paste0(ref_year, "-", sprintf("%02d", 1:12), "-01"))
+  month_doys   <- as.numeric(format(month_starts, "%j"))
+  month_labs   <- month.abb
+  
+  # Output path
+  p_graph_dir <- file.path(base_dir, "Obs/Graphs/Annual Min Date"); mk(p_graph_dir)
+  pdf_file_path <- file.path(p_graph_dir, paste0("gl_", glacier_num, "_", flowline_num, "_a_vel_min_d_fric1.pdf"))
+  
+  pdf(pdf_file_path, width = 11.5, height = 4)
+  par(mar = c(0.2, 0.2, 0.2, 0.75), oma = c(4.5, 4, 1.5, 0.75))
+  layout(matrix(c(1,2), nrow = 1), widths = c(5.8, 0.5))
+  
+  image(1:length(elevs_vec), 1:length(rev_years), t(plot_mat),
+        col = color_palette, breaks = breaks, axes = FALSE, xlab = "", ylab = "")
+  rect(xleft = 0.5, xright = length(elevs_vec) + 0.5,
+       ybottom = 0.5, ytop = length(rev_years) + 0.5, border = "black", lwd = 2)
+  
+  axis(1, at = 1:length(elevs_vec), labels = paste0(elevs_vec, "m"),
+       las = 2, tck = -0.04, lwd = 0, lwd.ticks = 1, cex.axis = 1)
+  axis(2, at = 1:length(rev_years), labels = rev_years,
+       las = 1, tck = -0.04, lwd = 0, lwd.ticks = 1, cex.axis = 1)
+  
+  mtext("year of study", side = 2, line = 3, outer = TRUE, cex = 1.1)
+  mtext("elevation band", side = 1, line = 3.5, outer = TRUE, cex = 1.1)
+  mtext(paste0("Glacier ", glacier_num + 1, " Flowline ", flowline_num, " - ", glacier_name),
+        side = 3, line = 0, outer = TRUE, cex = 1.3)
+  
+  # Legend (vertical gradient with month ticks)
+  par(mar = c(0.2, 0, 0.2, 2.75))
+  legend_vals <- matrix(seq(dmin, dmax, length.out = 1000), nrow = 1)
+  image(1, seq(dmin, dmax, length.out = 1000), legend_vals,
+        col = color_palette, breaks = breaks, axes = FALSE, xlab = "", ylab = "")
+  axis(4, at = month_doys, labels = month_labs, las = 1, cex.axis = 0.8, line = 0.1)
+  mtext("annual min date", side = 4, line = 2.25, cex = 0.8)
+  rect(xleft = 0.6, xright = 1.4, ybottom = dmin, ytop = dmax, border = "black", lwd = 2)
+  
+  dev.off()
+  cat("Annual min-date heatmap saved at:", pdf_file_path, "\n")
+  
+  # ---- Heatmap of ANNUAL MIN DATES (BINARY: May–Sep = orange, else = blue) ----
+  bin_mat <- matrix(NA_real_,
+                    nrow = nrow(obs_a_vel_min_d_mat),
+                    ncol = ncol(obs_a_vel_min_d_mat),
+                    dimnames = dimnames(obs_a_vel_min_d_mat))
+  
+  for (i in seq_len(nrow(obs_a_vel_min_d_mat))) {
+    for (j in seq_len(ncol(obs_a_vel_min_d_mat))) {
+      dstr <- obs_a_vel_min_d_mat[i, j]
+      if (!is.na(dstr) && nzchar(dstr)) {
+        dd <- as.Date(dstr)
+        if (!is.na(dd)) {
+          yr <- as.integer(format(dd, "%Y"))
+          in_summer <- (dd >= as.Date(paste0(yr, "-05-01"))) && (dd <= as.Date(paste0(yr, "-09-30")))
+          bin_mat[i, j] <- ifelse(in_summer, 1, 0)
+        }
+      }
+    }
+  }
+  
+  years_vec <- rownames(bin_mat)
+  elevs_vec <- as.numeric(colnames(bin_mat))
+  rev_years <- rev(years_vec)
+  plot_bin  <- bin_mat[rev_years, , drop = FALSE]
+  
+  color_palette <- c("blue", "orange")
+  breaks <- c(-0.5, 0.5, 1.5)
+  
+  p_graph_dir_bin <- file.path(base_dir, "Obs/Graphs/Annual Min Date Binary")
+  if (!dir.exists(p_graph_dir_bin)) dir.create(p_graph_dir_bin, recursive = TRUE)
+  pdf_file_path <- file.path(p_graph_dir_bin,
+                             paste0("gl_", glacier_num, "_", flowline_num, "_a_vel_min_db_fric1.pdf"))
+  
+  pdf(pdf_file_path, width = 11.5, height = 4)
+  par(mar = c(0.2, 0.2, 0.2, 0.75), oma = c(4.5, 4, 1.5, 0.75))
+  layout(matrix(c(1,2), nrow = 1), widths = c(5.8, 0.5))
+  
+  image(1:length(elevs_vec), 1:length(rev_years), t(plot_bin),
+        col = color_palette, breaks = breaks, axes = FALSE, xlab = "", ylab = "")
+  rect(xleft = 0.5, xright = length(elevs_vec) + 0.5,
+       ybottom = 0.5, ytop = length(rev_years) + 0.5, border = "black", lwd = 2)
+  
+  axis(1, at = 1:length(elevs_vec), labels = paste0(elevs_vec, "m"),
+       las = 2, tck = -0.04, lwd = 0, lwd.ticks = 1, cex.axis = 1)
+  axis(2, at = 1:length(rev_years), labels = rev_years,
+       las = 1, tck = -0.04, lwd = 0, lwd.ticks = 1, cex.axis = 1)
+  
+  mtext("year of study", side = 2, line = 3, outer = TRUE, cex = 1.1)
+  mtext("elevation band", side = 1, line = 3.5, outer = TRUE, cex = 1.1)
+  mtext(paste0("Glacier ", glacier_num + 1, " Flowline ", flowline_num, " - ", glacier_name),
+        side = 3, line = 0, outer = TRUE, cex = 1.3)
+  
+  # Legend panel
+  par(mar = c(0.2, 0, 0.2, 2.75))
+  legend_vals <- matrix(seq(-0.5, 1.5, length.out = 1000), nrow = 1)
+  image(1, seq(-0.5, 1.5, length.out = 1000), legend_vals,
+        col = color_palette, breaks = breaks, axes = FALSE, xlab = "", ylab = "")
+  axis(4, at = c(0, 1), labels = c("Oct–Apr", "May–Sep"),
+       las = 1, cex.axis = 0.8, line = 0.1)
+  mtext("annual min date (binary)", side = 4, line = 2.25, cex = 0.8)
+  rect(xleft = 0.6, xright = 1.4, ybottom = -0.5, ytop = 1.5, border = "black", lwd = 2)
+  
+  dev.off()
+  cat("Annual min-date BINARY heatmap saved at:", pdf_file_path, "\n")
   
 }

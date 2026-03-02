@@ -57,6 +57,12 @@ read_ratio_folder <- function(folder_path, friction_tag) {
       rownames(m) <- rownames(df)
       colnames(m) <- colnames(df)
     }
+    
+    # --- EXPLICITLY DROP MULTIYEAR MEAN ROW (match stats code) ---
+    if (!is.null(rownames(m))) {
+      m <- m[rownames(m) != "mean_2016_21", , drop = FALSE]
+    }
+    
     base <- basename(f)
     id <- sub(paste0("_ratio_", friction_tag, "\\.csv$"), "", base)
     out[[id]] <- m
@@ -167,7 +173,7 @@ plot_overlay_hist <- function(x1, x3, x2,
   xticks <- seq(floor(global_xrange[1]), ceiling(global_xrange[2]), by = 1)
   axis(1, at = xticks, labels = parse(text = paste0("10^", xticks)))
   mtext("count", side = 2, line = 3, cex = 1.1)
-  mtext("velocity driver, R", side = 1, line = 4.5, cex = 1.1)
+  mtext("similarity index, S", side = 1, line = 4.5, cex = 1.1)
   
   # Secondary axis (basal / front)
   usr <- par("usr"); xpd_prev <- par("xpd"); par(xpd = TRUE)
@@ -209,7 +215,7 @@ plot_overlay_hist <- function(x1, x3, x2,
 pdf(file.path(out_global, "all_hist.pdf"), width = 9, height = 6)
 par(mar = c(4, 4, 1, 1), oma = c(3.5, 4.5, 2, 1))
 plot_overlay_hist(x1_all, x2_all, x3_all,
-                  main_label = "Distribution of velocity drivers, Global")
+                  main_label = "Distribution of S, Global")
 dev.off()
 
 # 2) Year-specific histograms (now using fixed Y across all years)
@@ -248,7 +254,7 @@ for (yr in years_union) {
   pdf(file.path(out_years, paste0("year_", ychr, "_hist.pdf")), width = 9, height = 6)
   par(mar = c(4, 4, 1, 1), oma = c(3.5, 4.5, 2, 1))
   plot_overlay_hist(x1, x2, x3,
-                    main_label = paste0("Distribution of velocity drivers, Year ", ychr),
+                    main_label = paste0("Distribution of S, Year ", ychr),
                     ylim_override = year_ylim_max)
   dev.off()
 }
@@ -289,7 +295,7 @@ for (el in elevs_union) {
   pdf(file.path(out_elevs, paste0("elev_", echr, "_hist.pdf")), width = 9, height = 6)
   par(mar = c(4, 4, 1, 1), oma = c(3.25, 1, 2, 1))
   plot_overlay_hist(x1, x2, x3,
-                    main_label = paste0("Distribution of velocity drivers, Elevation ", echr),
+                    main_label = paste0("Distribution of S, Elevation ", echr),
                     ylim_override = elev_ylim_max)
   dev.off()
   
@@ -297,7 +303,7 @@ for (el in elevs_union) {
       width = 9, height = 6, units = "in", res = 600)
   par(mar = c(4, 4, 1, 1), oma = c(3.25, 1, 2, 1))
   plot_overlay_hist(x1, x2, x3,
-                    main_label = paste0("Distribution of velocity drivers, Elevation ", echr),
+                    main_label = paste0("Distribution of S, Elevation ", echr),
                     ylim_override = elev_ylim_max)
   dev.off()
 }
@@ -314,7 +320,7 @@ for (fid in flow_ids) {
   x2 <- if (!is.null(m2)) as.numeric(m2) else numeric(0)
   x3 <- if (!is.null(m3)) as.numeric(m3) else numeric(0)
   x1 <- x1[is.finite(x1) & x1 > 0]; x2 <- x2[is.finite(x2) & x2 > 0]; x3 <- x3[is.finite(x3) & x3 > 0]
-  title_main <- paste0("Distribution of velocity drivers\n",
+  title_main <- paste0("Distribution of S\n",
                        "Glacier ", glacier_num, ", Flowline ", flowline_num,
                        " \u2013 ", glacier_name)
   pdf(file.path(out_flows, paste0(fid, "_hist.pdf")), width = 9, height = 6)
@@ -382,7 +388,7 @@ plot_multi_hist <- function(values_list, group_label, friction_label, base_cols,
          border = c(NA, adjustcolor(cols, alpha.f = 0.9)),
          bty = "n", ncol = 1,
          text.col = c("black", rep("black", length(group_names))))
-  mtext(paste0("Distribution of velocity drivers by ", group_label, ", ", friction_label),
+  mtext(paste0("Distribution of S by ", group_label, ", ", friction_label),
         side = 3, line = 0.5, outer = TRUE, cex = 1.4)
 }
 
@@ -431,7 +437,7 @@ pub_pdf <- file.path(out_manus, "hist_text.pdf")
 pub_png <- file.path(out_manus, "hist_text.png")
 
 # Elevations to plot (choose any; default 5 as requested)
-sel_elevs <- c(200, 600, 1200, 1600)  # <-- edit this vector to pick which panels to show
+sel_elevs <- c(200, 700, 1200, 1700)  # <-- edit this vector to pick which panels to show
 
 # Precomputed per-elevation lists (from earlier code)
 fric1_by_elev <- collect_by_elev(fric1_list)
@@ -490,7 +496,7 @@ plot_one_panel_pub <- function(el, show_xaxis = FALSE, show_ylabel = FALSE, ylim
        col = adjustcolor(col3, 0.35), border = adjustcolor(col3, 0.9))
   
   # Y axis + label (middle panel only)
-  axis(2, las = 1)
+  axis(2, las = 1, cex.axis = 1.5)
   if (show_ylabel) mtext("count", side = 2, line = -2, cex = 1.1, outer = TRUE)
   
   # Medians (log domain)
@@ -504,22 +510,34 @@ plot_one_panel_pub <- function(el, show_xaxis = FALSE, show_ylabel = FALSE, ylim
   # Threshold at 10^0
   abline(v = 0, col = "black", lwd = 1)
   
-  # Legend INSIDE (top-left) with bold elevation label
+  # --- Elevation title + legend (only top panel) ---
+  
   usr <- par("usr")
-  lg_x <- usr[1] + 0.02 * diff(usr[1:2])
-  title_y <- usr[4] - 0.06 * diff(usr[3:4])  # slightly lower to avoid clipping
-  text(lg_x, title_y, paste0(el, " m a.s.l."), adj = c(0, 1), font = 2, xpd = FALSE)
-  legend(lg_x, title_y - 0.03 * diff(usr[3:4]),
-         legend = leg_labels,
-         fill   = c(adjustcolor(col1, 0.35), adjustcolor(col2, 0.35), adjustcolor(col3, 0.35)),
-         border = c(adjustcolor(col1, 0.9),  adjustcolor(col2, 0.9),  adjustcolor(col3, 0.9)),
-         bty = "n", ncol = 1, xpd = FALSE)
+  lg_x    <- usr[1] + 0.02 * diff(usr[1:2])
+  title_y <- usr[4] - 0.06 * diff(usr[3:4])
+  
+  # Title always on each panel
+  text(lg_x, title_y, paste0(el, " m a.s.l."),
+       adj = c(0, 1), font = 2, cex = 1.5, xpd = FALSE)
+  
+  # Legend ONLY on the top panel
+  if (el == sel_elevs[1]) {
+    legend(lg_x, title_y - 0.03 * diff(usr[3:4]),
+           legend = leg_labels,
+           fill   = c(adjustcolor(col1, 0.35),
+                      adjustcolor(col2, 0.35),
+                      adjustcolor(col3, 0.35)),
+           border = c(adjustcolor(col1, 0.9),
+                      adjustcolor(col2, 0.9),
+                      adjustcolor(col3, 0.9)),
+           bty = "n", ncol = 1, cex = 1.5, xpd = FALSE)
+  }
   
   # X-axis and secondary inverted axis only on bottom panel
   if (show_xaxis) {
     xticks <- seq(floor(global_xrange[1]), ceiling(global_xrange[2]), by = 1)
-    axis(1, at = xticks, labels = parse(text = paste0("10^", xticks)))
-    mtext("seasonality index, S", side = 1, line = 4.5, cex = 1.1)
+    axis(1, at = xticks, labels = parse(text = paste0("10^", xticks)), cex.axis = 1.5)
+    mtext("similarity index, S", side = 1, line = 6, cex = 1.3)
     
     # Secondary inverted axis (basal / front)
     xpd_prev <- par("xpd"); par(xpd = NA)   # allow drawing into the outer margin
@@ -533,8 +551,8 @@ plot_one_panel_pub <- function(el, show_xaxis = FALSE, show_ylabel = FALSE, ylim
     }
     mid_left  <- (x_min_tick + 0) / 2
     mid_right <- (x_max_tick + 0) / 2
-    text(mid_left,  axis_bottom_y - 0.045 * diff(usr[3:4]), "basal",  cex = 1)
-    text(mid_right, axis_bottom_y - 0.045 * diff(usr[3:4]), "front",  cex = 1)
+    text(mid_left,  axis_bottom_y - 0.045 * diff(usr[3:4]), "basal",  cex = 1.75)
+    text(mid_right, axis_bottom_y - 0.045 * diff(usr[3:4]), "frontal",  cex = 1.75)
     par(xpd = xpd_prev)
   }
 }
@@ -564,7 +582,7 @@ draw_publication_panels <- function() {
     plot_one_panel_pub(sel_elevs[i], show_xaxis = show_x, show_ylabel = show_y)
   }
   # Outer y-label centered on figure when even number of panels
-  if (even_panels) mtext("count", side = 2, line = 0, cex = 1.1, outer = TRUE)
+  if (even_panels) mtext("count", side = 2, line = 0, cex = 1.3, outer = TRUE)
   dev.off()
   
   # PNG
@@ -576,7 +594,7 @@ draw_publication_panels <- function() {
     show_y <- (!even_panels && i == ceiling(n_panels/2))
     plot_one_panel_pub(sel_elevs[i], show_xaxis = show_x, show_ylabel = show_y)
   }
-  if (even_panels) mtext("count", side = 2, line = 2, cex = 1.1, outer = TRUE)
+  if (even_panels) mtext("count", side = 2, line = 0, cex = 1.3, outer = TRUE)
   dev.off()
 }
 

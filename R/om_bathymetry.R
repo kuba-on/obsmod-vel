@@ -1,6 +1,5 @@
 ########################################
-# Correlate velocity & latitude with ratio bands (fric1/2/3)
-# BASE R ONLY
+# The code below correlates bathymetry, mean annual velocity and latitude with ratio results (fric1/2/3).
 ########################################
 
 # ---- Shared inputs (reuse your ratio files setup) ----
@@ -94,7 +93,7 @@ build_plotter <- function(global_breaks, xticks, global_yrange, y_label) {
     axis(2, las = 1)
     axis(1, at = xticks, labels = parse(text = paste0("10^", xticks)))
     mtext(y_label,                     side = 2, line = 3, cex = 1.1)
-    mtext("velocity driver, R",        side = 1, line = 4.5, cex = 1.1)
+    mtext("similarity index, S",        side = 1, line = 4.5, cex = 1.1)
     abline(v = 0, col = "black", lwd = 1)  # 10^0
     usr <- par("usr"); xpd_prev <- par("xpd"); par(xpd = TRUE)
     axis_bottom_y <- usr[3] - 0.15 * diff(usr[3:4])
@@ -372,3 +371,120 @@ for (fric in names(prep_lat$merged_list)) {
   
   write.csv(res_lat, file.path(lat_csv_dir, sprintf("lat_ratio_corr_%s.csv", fric)), row.names = FALSE)
 }
+
+# =========================
+# 3) BATHYMETRY vs RATIO
+# =========================
+
+# ---- Outputs: Bathymetry ----
+base_corr_dir  <- "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Bathymetry Analysis/Correlation"
+csv_out_dir    <- file.path(base_corr_dir, "CSV")
+graphs_base    <- file.path(base_corr_dir, "Graphs")
+graphs_pdf_dir <- file.path(graphs_base, "PDF")
+graphs_png_dir <- file.path(graphs_base, "PNG")
+
+suppressWarnings(dir.create(csv_out_dir,    recursive = TRUE, showWarnings = FALSE))
+suppressWarnings(dir.create(graphs_pdf_dir, recursive = TRUE, showWarnings = FALSE))
+suppressWarnings(dir.create(graphs_png_dir, recursive = TRUE, showWarnings = FALSE))
+
+# Build global fixed X (from all ratio values) and fixed Y (from all bed_mean)
+all_ratio_vals <- numeric(0)
+for (fric in names(ratio_files)) {
+  rdf <- read.csv(ratio_files[[fric]], check.names = FALSE, stringsAsFactors = FALSE)
+  missing_r <- setdiff(key_cols, names(rdf)); if (length(missing_r)) next
+  rdf$glacier_ID <- suppressWarnings(as.integer(rdf$glacier_ID))
+  rdf <- subset(rdf, !(glacier_ID %in% c(103, 104)))
+  elev_cols <- get_elev_cols(rdf)
+  if (length(elev_cols)) {
+    v <- unlist(rdf[, elev_cols, drop = FALSE], use.names = FALSE)
+    v <- as.numeric(v); v <- v[is.finite(v) & v > 0]
+    all_ratio_vals <- c(all_ratio_vals, v)
+  }
+}
+if (!length(all_ratio_vals)) stop("No positive ratio values after filtering.")
+lx_all <- log10(all_ratio_vals)
+global_xrange <- range(lx_all, na.rm = TRUE)
+raw_breaks <- seq(floor(global_xrange[1]), ceiling(global_xrange[2]), by = 0.1)
+if (!any(abs(raw_breaks) < 1e-8)) raw_breaks <- sort(unique(c(raw_breaks, 0)))
+global_breaks <- raw_breaks
+xticks <- seq(floor(global_xrange[1]), ceiling(global_xrange[2]), by = 1)
+
+all_bed_vals <- as.numeric(bed_df$bed_mean); all_bed_vals <- all_bed_vals[is.finite(all_bed_vals)]
+yr <- range(all_bed_vals, na.rm = TRUE); pad_y <- 0.05 * diff(yr); if (!is.finite(pad_y)) pad_y <- 1
+bed_global_yrange <- c(yr[1] - pad_y, yr[2] + pad_y)
+plot_bed <- build_plotter(global_breaks, xticks, bed_global_yrange)
+
+# build once, outside the per-law loop
+plot_bed <- build_plotter(
+  global_breaks, xticks, bed_global_yrange,
+  y_label = "bed elevation at the glacier front [in m a.s.l.]"
+)
+
+# Do per-law "100–500 mean" correlation, update CSVs, and save plots
+for (fric in names(ratio_files)) {
+  rdf <- read.csv(ratio_files[[fric]], check.names = FALSE, stringsAsFactors = FALSE)
+  missing_r <- setdiff(key_cols, names(rdf))
+  if (length(missing_r)) { warning(paste("Skipping", fric, "- missing key columns:", paste(missing_r, collapse = ", "))); next }
+  rdf$glacier_ID <- suppressWarnings(as.integer(rdf$glacier_ID))
+  rdf <- subset(rdf, !(glacier_ID %in% c(103, 104)))
+  
+  merged <- merge(bed_df, rdf, by = key_cols, all = FALSE)
+  if (!nrow(merged)) { warning(paste("No matches after merge for", fric)); next }
+  
+  elev_cols <- get_elev_cols(rdf)
+  elev_nums <- as.numeric(elev_cols)
+  use_cols <- as.character(sort(elev_nums[elev_nums >= 100 & elev_nums <= 500]))
+  if (!length(use_cols)) { warning(paste("No 100–500 elevation columns for", fric)); next }
+  
+  ratio_mean_100_500 <- rowMeans(merged[, use_cols, drop = FALSE], na.rm = TRUE)
+  x_use <- as.numeric(ratio_mean_100_500)
+  y_use <- as.numeric(merged$bed_mean)
+  
+  ok <- is.finite(x_use) & x_use > 0 & is.finite(y_use)
+  x_use <- x_use[ok]; y_use <- y_use[ok]
+  
+  rho <- NA_real_; pval <- NA_real_
+  if (length(x_use) >= 3) {
+    ct <- suppressWarnings(cor.test(x_use, y_use, method = "spearman", exact = FALSE))
+    rho <- unname(ct$estimate); pval <- ct$p.value
+  }
+  
+  # --- Save/Update CSV row "100-500" for this law ---
+  bed_csv_law <- file.path(csv_out_dir, sprintf("bed_ratio_corr_%s.csv", fric))
+  if (file.exists(bed_csv_law)) {
+    res_df <- read.csv(bed_csv_law, check.names = FALSE, stringsAsFactors = FALSE)
+    # normalize column names
+    if (!("p_value" %in% names(res_df)) && ("p-value" %in% names(res_df))) {
+      names(res_df)[names(res_df) == "p-value"] <- "p_value"
+    }
+    if (!("p_value" %in% names(res_df))) res_df$p_value <- NA_real_
+  } else {
+    res_df <- data.frame(elev = character(0), Spearman_rho = numeric(0), p_value = numeric(0), stringsAsFactors = FALSE)
+  }
+  # overwrite or append the "100-500" row
+  if ("100-500" %in% res_df$elev) {
+    res_df$Spearman_rho[res_df$elev == "100-500"] <- rho
+    res_df$p_value[res_df$elev == "100-500"]      <- pval
+  } else {
+    res_df <- rbind(res_df, data.frame(elev = "100-500", Spearman_rho = rho, p_value = pval, stringsAsFactors = FALSE))
+  }
+  write.csv(res_df, bed_csv_law, row.names = FALSE)
+  
+  # --- Plots (PDF + PNG) ---
+  law_pdf_dir <- file.path(graphs_pdf_dir, fric)
+  law_png_dir <- file.path(graphs_png_dir, fric)
+  suppressWarnings(dir.create(law_pdf_dir, recursive = TRUE, showWarnings = FALSE))
+  suppressWarnings(dir.create(law_png_dir, recursive = TRUE, showWarnings = FALSE))
+  
+  # PDF
+  pdf(file.path(law_pdf_dir, sprintf("bed_ratio_corr_100-500_%s.pdf", fric)), width = 9, height = 6)
+  plot_bed(x_use, y_use, main_label = sprintf("Elevation 100–500 mean, %s", fric))
+  dev.off()
+  
+  # PNG
+  png(file.path(law_png_dir, sprintf("bed_ratio_corr_100-500_%s.png", fric)),
+      width = 9, height = 6, units = "in", res = 300)
+  plot_bed(x_use, y_use, main_label = sprintf("Elevation 100–500 mean, %s", fric))
+  dev.off()
+}
+

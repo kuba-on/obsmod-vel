@@ -25,7 +25,7 @@ from itslive.velocity_cubes._cubes import get_time_series, export_csv
 # Define directories and catalog URL
 CATALOG_URL = "https://its-live-data.s3.amazonaws.com/datacubes/catalog_v02.json"
 INPUT_DIR = "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/New Points v3/Points/Sampling Points/as CSV"
-OUTPUT_DIR = "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version 3/Jess ITS_LIVE v3"
+OUTPUT_DIR = "/Users/jagon/Documents/Projects/Collabs/Jessica Badgeley/Version TICOI/Jess ITS_LIVE v4"
 
 # Load ITS_LIVE catalog
 catalog = gpd.read_file(CATALOG_URL)
@@ -87,7 +87,7 @@ def main():
                 continue
 
             input_csv = os.path.join(g_path, file)
-            name_out = file.replace(".csv", "_itslive_v3")
+            name_out = file.replace(".csv", "_itslive_v4")
             output_dir_path = os.path.join(OUTPUT_DIR, glacier_folder, name_out)
             os.makedirs(output_dir_path, exist_ok=True)
             glacier_info = extract_glacier_info(input_csv)
